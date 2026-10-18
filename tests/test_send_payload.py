@@ -81,6 +81,7 @@ class SenderTests(unittest.TestCase):
         self.assertEqual(sender.main(self.args), 1)
         connect.assert_not_called()
         self.assertEqual(sidecar.read_text(), 'preserved')
+        self.assertFalse(self.log.exists())
 
     @patch.object(sender.socket, 'create_connection', side_effect=OSError('unreachable'))
     def test_connection_failure_does_not_retry(self, connect):

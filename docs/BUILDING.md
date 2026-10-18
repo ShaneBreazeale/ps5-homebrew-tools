@@ -38,14 +38,17 @@ SDK bootstrap is not included in this initial import.
 | `make thread-probe-v1 thread-probe-v2` | Compile the raw collectors |
 | `make kernel-capture capture-export` | Build the collector and exporter |
 | `make bundle` | Build payloads and package source, binaries, and SHA-256 inventory |
-| `python3 tooling/native/build.py` | Build the native app folder and ZIP; see [native app](NATIVE_APP.md) |
+| `make native-app` | Build the native app folder and ZIP; see [native app](NATIVE_APP.md) |
+| `make native-check` | Rebuild the native host tools and runtime and verify pinned checksums, without an SDK |
 | `make minimal-payload` | Compile the starter payload |
-| `make check` | Run host tests without an SDK or console |
+| `make reader3`, `make procwatch`, `make shellshot` | Copy a tool to its historical research name in `out/` |
+| `make check` | Run Python host tests and the C paging mock test (`HOST_CC`, default `cc`) without an SDK or console |
 | `make clean` | Remove generated payload files |
 
 All root-build artifacts go into `out/`. `make bundle` writes
 `dist/ps5-homebrew-tools.tar.gz` and refuses to replace an existing archive.
-The archive contains source, built ELFs, `manifest.json`, and `SHA256SUMS`;
+The archive contains Git-tracked source, built ELFs, `manifest.json`, and `SHA256SUMS`;
+untracked files are never included, and `source_dirty` records uncommitted changes;
 keep the manifest with binaries when sharing builds. Override `CFLAGS`, `CPPFLAGS`,
 `LDFLAGS`, and `LDLIBS` using Make variables if needed.
 

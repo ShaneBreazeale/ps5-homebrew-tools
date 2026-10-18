@@ -53,8 +53,8 @@ before passing it to the script. V1 logs and resident snapshot logs are differen
 
 The parser checks contiguous raw chunks, process/thread record sizes, ownership,
 TID consistency, the live layout-validation marker, completion, and the presence
-of all three process/thread passes. Invalid or incomplete captures raise an
-exception and return a nonzero exit status. Shell redirection can still leave an
+of all three process/thread passes. Invalid or incomplete captures print an
+`error:` line to stderr and exit with status 2. Shell redirection can still leave an
 empty JSON file after such a failure; retain the raw input and terminal error.
 
 | JSON field | Contents |

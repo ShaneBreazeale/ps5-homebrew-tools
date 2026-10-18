@@ -112,8 +112,18 @@ def summarize(text):
     }
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('capture', type=Path)
     args = parser.parse_args()
-    print(json.dumps(summarize(args.capture.read_text()), indent=2))
+    try:
+        result = summarize(args.capture.read_text(encoding='utf-8', errors='backslashreplace'))
+    except KeyError as error:
+        parser.exit(2, f'error: thread record without a matching header: {error}\n')
+    except (OSError, ValueError, struct.error) as error:
+        parser.exit(2, f'error: {error}\n')
+    print(json.dumps(result, indent=2))
+
+
+if __name__ == '__main__':
+    main()

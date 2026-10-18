@@ -16,8 +16,17 @@ files. From the repository root:
 ```sh
 export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk
 export LLVM_CONFIG=/path/to/llvm-config
-python3 tooling/native/build.py
+make native-app    # or: python3 tooling/native/build.py
 ```
+
+To check only the host converter and generated runtime, without an SDK:
+
+```sh
+make native-check  # or: python3 tooling/native/build.py --runtime-only
+```
+
+This compiles the host tools in a temporary directory, regenerates `libc.prx`,
+verifies both pinned checksums, and keeps no output.
 
 The command writes `out/native-app/PPSA99001/`, `PPSA99001.zip`, the host
 converter and runtime generator, and an intermediate `eboot.elf`. The folder

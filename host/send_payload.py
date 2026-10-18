@@ -54,7 +54,15 @@ def main(argv=None):
                                  'started_at': None, 'ended_at': None,
                                  'outcome': 'prepared'}
         manifest_path = Path(str(args.log) + '.json')
-        with args.log.open('xb') as capture, manifest_path.open('x', encoding='utf-8') as metadata:
+        capture = args.log.open('xb')
+        try:
+            metadata = manifest_path.open('x', encoding='utf-8')
+        except OSError:
+            # Release the empty log so a stale sidecar does not leave an orphan.
+            capture.close()
+            args.log.unlink()
+            raise
+        with capture, metadata:
             write_manifest(metadata, manifest)
             try:
                 manifest['transport']['started_at'] = utc_now()

@@ -69,7 +69,7 @@ def receive(sock, output, max_bytes=MAX_BYTES):
             total += size
         if set(files) != {'manifest.json', 'kernel_text.bin'}:
             raise ValueError('missing manifest or kernel capture')
-        manifest = json.loads((stage / 'manifest.json').read_text())
+        manifest = json.loads((stage / 'manifest.json').read_text(encoding='utf-8'))
         if not isinstance(manifest, dict):
             raise ValueError('manifest must be a JSON object')
         payload = files['kernel_text.bin']

@@ -22,7 +22,8 @@ def package(output, artifacts):
     if output.exists():
         raise FileExistsError(f'output exists: {output}')
     output.parent.mkdir(parents=True, exist_ok=True)
-    paths = git('ls-files', '--cached', '--others', '--exclude-standard', '-z').split('\0')
+    # Tracked files only: untracked notes or captures must never ship in a bundle.
+    paths = git('ls-files', '--cached', '-z').split('\0')
     sources = [ROOT / name for name in paths if name and (ROOT / name).is_file()]
     selected = []
     for arg in artifacts:

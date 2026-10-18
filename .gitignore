@@ -6,3 +6,6 @@ __pycache__/
 /dist/
 /templates/minimal-payload/out/
 /templates/minimal-app/out/
+.venv/
+.vscode/
+.idea/

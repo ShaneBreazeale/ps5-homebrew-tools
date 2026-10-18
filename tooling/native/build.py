@@ -39,6 +39,29 @@ def icon(path):
             rows.extend((35, 193, 172, 255) if edge and not cutout else (15, 25, 42, 255))
     path.write_bytes(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 512, 512, 8, 6, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(bytes(rows), 9)) + chunk(b'IEND', b''))
 
+def build_runtime(work):
+    """Compile the host tools and regenerate libc.prx, checking pinned checksums."""
+    cxx = shlex.split(os.environ.get('CXX', 'c++'))
+    tool = work / 'ps5-native-tool'
+    libc = work / 'libc-builder'
+    common = ['-std=c++20', '-O2', '-Wall', '-Wextra', '-Werror']
+    run(*cxx, *common, *[NATIVE / (n + '.cpp') for n in ['native_app_builder', 'self_container', 'elf_object', 'sce_module_writer']], '-lz', '-o', tool)
+    run(*cxx, *common, NATIVE / 'libc_builder.cpp', '-o', libc)
+    raw = work / 'libc.elf'
+    runtime = work / 'libc.prx'
+    run(libc, NATIVE / 'runtime/api-surface.txt', NATIVE / 'runtime/imports.txt', raw)
+    if sha(raw) != RAW_SHA:
+        raise ValueError('generated raw runtime does not match upstream checksum')
+    run(tool, 'self', '--sign', '--in', raw, '--out', runtime)
+    if sha(runtime) != SIGNED_SHA:
+        raise ValueError('generated signed runtime does not match upstream checksum')
+    return tool, libc, runtime
+
+def check_runtime():
+    with tempfile.TemporaryDirectory(prefix='native-check-') as temp:
+        build_runtime(Path(temp))
+    print('Native runtime checksums match pinned values; console validation: pending')
+
 def build(args):
     sdk = args.sdk.resolve()
     source = args.template.resolve()
@@ -56,22 +79,9 @@ def build(args):
     archive = output / (title + '.zip')
     if destination.exists() or archive.exists():
         raise FileExistsError('application output exists; choose a new --output directory')
-    cxx = shlex.split(os.environ.get('CXX', 'c++'))
     with tempfile.TemporaryDirectory(prefix='.native-build-', dir=output) as temp:
         work = Path(temp)
-        tool = work / 'ps5-native-tool'
-        libc = work / 'libc-builder'
-        common = ['-std=c++20', '-O2', '-Wall', '-Wextra', '-Werror']
-        run(*cxx, *common, *[NATIVE / (n + '.cpp') for n in ['native_app_builder', 'self_container', 'elf_object', 'sce_module_writer']], '-lz', '-o', tool)
-        run(*cxx, *common, NATIVE / 'libc_builder.cpp', '-o', libc)
-        raw = work / 'libc.elf'
-        runtime = work / 'libc.prx'
-        run(libc, NATIVE / 'runtime/api-surface.txt', NATIVE / 'runtime/imports.txt', raw)
-        if sha(raw) != RAW_SHA:
-            raise ValueError('generated raw runtime does not match upstream checksum')
-        run(tool, 'self', '--sign', '--in', raw, '--out', runtime)
-        if sha(runtime) != SIGNED_SHA:
-            raise ValueError('generated signed runtime does not match upstream checksum')
+        tool, libc, runtime = build_runtime(work)
         objects = []
         for unit in [NATIVE / 'app_crt.cpp', NATIVE / 'app_cpp_runtime.cpp', source / 'main.cpp']:
             obj = work / (unit.stem + '.o')
@@ -110,11 +120,13 @@ def main():
     parser.add_argument('--sdk', type=Path, default=os.environ.get('PS5_PAYLOAD_SDK'))
     parser.add_argument('--template', type=Path, default=ROOT / 'templates/minimal-app')
     parser.add_argument('--output', type=Path, default=ROOT / 'out/native-app')
+    parser.add_argument('--runtime-only', action='store_true',
+                        help='rebuild host tools and libc.prx in a temporary directory, verify checksums, keep nothing; no SDK needed')
     args = parser.parse_args()
-    if args.sdk is None:
+    if args.sdk is None and not args.runtime_only:
         parser.error('set PS5_PAYLOAD_SDK or pass --sdk')
     try:
-        build(args)
+        check_runtime() if args.runtime_only else build(args)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.exit(1, f'native build failed: {error}\n')
 

@@ -98,11 +98,14 @@ completion. A timeout can leave the payload running. See the
 ## Development
 
 ```sh
-make help     # List build and test targets
-make check    # Run host tests without an SDK or console
+make help          # List build and test targets
+make check         # Run host tests without an SDK or console
+make native-check  # Rebuild the native runtime and verify pinned checksums
 ```
 
-Generated binaries and local captures are ignored by Git. To start a new tool,
+Continuous integration runs both checks on Linux and macOS for every push and
+pull request; it never builds payloads or contacts a console. Generated binaries
+and local captures are ignored by Git. To start a new tool,
 copy the [minimal payload template](templates/minimal-payload/README.md); it builds
 independently of this repository.
 

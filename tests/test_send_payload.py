@@ -66,7 +66,8 @@ class SenderTests(unittest.TestCase):
     def test_idle_timeout_keeps_partial_capture_without_resending(self, connect):
         connection = MagicMock()
         connect.return_value.__enter__.return_value = connection
-        connection.recv.side_effect = [b'partial\n', TimeoutError()]
+        # socket.timeout is distinct from TimeoutError before Python 3.10.
+        connection.recv.side_effect = [b'partial\n', socket.timeout()]
         self.assertEqual(sender.main(self.args), 2)
         connect.assert_called_once()
         connection.sendall.assert_called_once()

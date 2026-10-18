@@ -81,3 +81,11 @@ counts and raw `threads_end` records to assess your capture's truncation.
 The sender writes a `*.log.json` sidecar with payload/capture hashes, source
 revision, timestamps, transport outcome, and optional operator-supplied firmware,
 model, and resident profile. Keep this sidecar with the raw log.
+
+## Debugger validation
+
+`validate_debugger.py --host HOST --elf out/process-debugger.elf --report NEW.json`
+exercises the process debugger with its own disposable child and preserves a
+non-overwritten JSON transcript and payload hash. It requires a running debugger
+(default port 1234) and currently fails at the known-unvalidated data watchpoint
+check on retail 13.60. See [the debugger guide](../payloads/process-debugger/README.md).

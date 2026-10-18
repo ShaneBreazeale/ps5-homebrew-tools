@@ -15,6 +15,7 @@ Choose a tool for the question you want to answer:
 
 | Tool | Use it to |
 | --- | --- |
+| [Process debugger](payloads/process-debugger/README.md) | Attach by PID, inspect registers/memory, step instructions, and set hardware execution breakpoints; partial console validation |
 | [Process snapshot](payloads/process-snapshot/README.md) | Take one snapshot of shell and app-related processes |
 | [Process watch](payloads/process-watch/README.md) | Watch process births, disappearances, and zombie transitions over three minutes |
 | [Resident snapshot](payloads/resident-snapshot/README.md) | Read three snapshots of counters and event rings from a matching instrumented kstuff resident |

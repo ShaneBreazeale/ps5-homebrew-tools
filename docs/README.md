@@ -32,3 +32,6 @@ Commands in the guides run from the repository root unless stated otherwise.
 - [Provenance](PROVENANCE.md) and [import manifest](imports.json): source identities.
 - [Initial validation](VALIDATION.md): what was actually built and tested.
 - [Third-party notices](../THIRD_PARTY_NOTICES.md): imported code and license notices.
+
+- [Process debugger](../payloads/process-debugger/README.md) — GDB process tracing and its current limitations.
+- [Debugger validation](DEBUGGER_VALIDATION.md) — gpubox build and partial console evidence.

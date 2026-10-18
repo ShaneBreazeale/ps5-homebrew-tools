@@ -43,3 +43,15 @@ For a future release, record the source commit and local modifications, SDK
 version or archive checksum, host compiler version, build command, output
 checksums, and console model/firmware used for testing. Distinguish compiled,
 host-tested, and console-tested artifacts.
+
+## Process debugger
+
+The process backend is new homebrew-tools code. Its packet codec and register
+layout are adapted from the local prosper0gdb/shared GDB stub. The debugger
+uses the Payload SDK build and startup, not the research runtime. Source and
+imported hashes, transformations, and BSD host-only ABI test fixtures are in
+[debugger-imports.json](debugger-imports.json). Privilege handling follows the
+installed SDK's `samples/test_privileges/main.c`; kernel save-area investigation
+also consulted the primary [ps5debug-NG implementation](https://github.com/Pharaoh2k/ps5debug-NG/blob/master/debugger/source/kern_dbreg.c).
+The experimental save-area locator verifies live values instead of adopting
+that project's fixed PCB offsets.

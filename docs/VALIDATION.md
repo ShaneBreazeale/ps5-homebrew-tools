@@ -57,3 +57,10 @@ resident patch archives were not executed or rebuilt.
 
 Build output and the historical capture used for validation are excluded from
 the source repository.
+
+## Process debugger (2026-10-18)
+
+The standard gpubox LLVM 18.1.8 build and 42 host tests pass. Console tests
+confirmed child-process attachment, GP register/memory access, instruction
+stepping, and a hardware execution breakpoint. Data watchpoints and the full
+validation sequence remain incomplete; see [the detailed debugger record](DEBUGGER_VALIDATION.md).

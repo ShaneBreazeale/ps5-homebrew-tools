@@ -1,0 +1,30 @@
+[
+  {
+    "source": "research/kstuff-lite/gdb_stub/dbg.c",
+    "destination": "vendor/prosper0gdb/rsp_transport.h",
+    "source_sha256": "1a57de55b63438e9a2ad12e448080ec0ee1df374c5e897755d0186d1d8b2be8e",
+    "imported_sha256": "02675fa6137545e2ebf4261860840ed9f0766bef5200fc0718a9781edf60a4ee",
+    "changes": "Retain packet transport only; replace platform/runtime headers with SDK headers; make packet buffer lengths static. Remove unused packet-drain helper; check packet-buffer mmap failures."
+  },
+  {
+    "source": "research/kstuff-lite/gdb_stub/trap_state.h",
+    "destination": "vendor/prosper0gdb/trap_state.h",
+    "source_sha256": "689c1650541b94dc2544ada238072163c22fcd6f053528309c42f1cae659eee2",
+    "imported_sha256": "689c1650541b94dc2544ada238072163c22fcd6f053528309c42f1cae659eee2",
+    "changes": "Unchanged register layout."
+  },
+  {
+    "source": "research/kstuff-lite/freebsd-headers/machine/reg.h",
+    "destination": "tests/debugger-abi/machine/reg.h",
+    "source_sha256": "5d91b037f1acd7a5c8c6838af242a3eb471e1ab95e7bc7d7498f294895722545",
+    "imported_sha256": "5d91b037f1acd7a5c8c6838af242a3eb471e1ab95e7bc7d7498f294895722545",
+    "changes": "Unchanged; host test fixture only."
+  },
+  {
+    "source": "research/kstuff-lite/freebsd-headers/sys/ptrace.h",
+    "destination": "tests/debugger-abi/sys/ptrace.h",
+    "source_sha256": "a7031d20adf30712ec1337e3f1251cd8c6b43c6f4ad29fe7f28aa483f8722239",
+    "imported_sha256": "a7031d20adf30712ec1337e3f1251cd8c6b43c6f4ad29fe7f28aa483f8722239",
+    "changes": "Unchanged; host test fixture only."
+  }
+]

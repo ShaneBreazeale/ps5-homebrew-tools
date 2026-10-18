@@ -52,7 +52,7 @@ CFLAGS += -Wall -Wextra
 define link_cleanup
 $(OBJCOPY) --remove-section=.comment $@
 endef
-TOOLS := resident-snapshot process-watch process-snapshot thread-probe-v1 thread-probe-v2 kernel-capture capture-export
+TOOLS := process-debugger resident-snapshot process-watch process-snapshot thread-probe-v1 thread-probe-v2 kernel-capture capture-export
 
 .DELETE_ON_ERROR:
 .PHONY: all
@@ -72,5 +72,9 @@ $(addprefix out/,$(addsuffix .elf,process-watch process-snapshot thread-probe-v1
 out/kernel-capture.elf: payloads/kernel-capture/paging.h payloads/kernel-capture/profile_13_60_pro.h
 
 out/minimal-payload.elf: templates/minimal-payload/main.c | out
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
+	$(link_cleanup)
+
+out/process-debugger.elf: payloads/process-debugger/main.c payloads/process-debugger/hwbreak.h vendor/prosper0gdb/rsp_transport.h vendor/prosper0gdb/trap_state.h | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
 	$(link_cleanup)

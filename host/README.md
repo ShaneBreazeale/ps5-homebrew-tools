@@ -1,6 +1,6 @@
 # Host utilities
 
-Run these commands with Python 3.9+ from the repository root. Both scripts use
+Run these commands with Python 3.9+ from the repository root. The scripts use
 the standard library and support `--help`.
 
 ## Send one payload
@@ -71,6 +71,15 @@ candidates; the summary is not a crash diagnosis. The current parser always
 includes the historical ShellCore-cap note in `limits`; inspect actual thread
 counts and raw `threads_end` records to assess your capture's truncation.
 
+## Kernel offset planning
+
+`kernel_offset.py --dump RAW --anchor exec --offset 0xcfc12` validates the
+profile hash and resolves the investigation's shorthand to raw offset `0x38fc12`.
+It makes no connection and emits no breakpoint command. With `--probe LOG`, it
+can relocate from one validated, dated kernel-offset probe observation. See
+[the kernel backend guide](../docs/KERNEL_DEBUGGER.md) for anchors, required
+resume/page gates, refusal statuses and unfinished execution control.
+
 ## Other host tools
 
 - [Capture receiver](../docs/CAPTURE_TOOLS.md): receive and verify a kernel capture.
@@ -88,4 +97,4 @@ model, and resident profile. Keep this sidecar with the raw log.
 exercises the process debugger with its own disposable child and preserves a
 non-overwritten JSON transcript and payload hash. It requires a running debugger
 (default port 1234) and currently fails at the known-unvalidated data watchpoint
-check on retail 13.60. See [the debugger guide](../payloads/process-debugger/README.md).
+check on retail 13.60. See [the CLI runbook](../docs/DEBUGGER.md), [agent guide](../docs/DEBUGGER_AGENTS.md), and [recovery note](../docs/DEBUGGER_RECOVERY.md).

@@ -3,7 +3,7 @@
 The process server is integrated into the ordinary homebrew-tools SDK build.
 It is partially console-tested, not a fully validated arbitrary-process debugger.
 
-## Final build
+## Historical final build
 
 - Build host: gpubox, isolated directory `/tmp/ps5-homebrew-debugger-final`.
 - SDK: `/home/shane/stage0-build/ci-sdk/opt/ps5-payload-sdk`.
@@ -75,12 +75,41 @@ for exactly which commands completed; no full validator run passed.
   versions were left resident while debugging ports 1234–1240; cleanup after
   loss of connectivity could not be verified. A console restart, if performed
   by the operator, ends these volatile processes.
-- Validate the experimental PCB fallback and credential restoration with direct
-  kernel evidence. Its locator gates firmware/SoC, validates thread ownership
-  and TID, and requires one matching six-register save area before writing.
+- Investigate data traps and credential restoration using a bounded, separately
+  authorized test. The historical direct-PCB fallback is retired from current
+  source, its build macro is rejected, and it must not be sent into kstuff.
+  See [recovery and kernel scope](DEBUGGER_RECOVERY.md).
 - Finish data watchpoints, detach/resume, disconnect cleanup, and signal delivery
   tests. Some detach commands returned OK; full post-detach execution and
   reconnect validation did not complete.
 - Test a real GDB client, multiple threads and thread creation, module/symbol
   discovery, and arbitrary system/game attachment subject to PS5 AppContext
   rules. The existing tests establish attachment to our child, not every PID.
+
+## Source hardening and documentation follow-up
+
+The current working changes retire the direct-PCB writer and reject the old
+build macro. Ptrace debug-register writes and rollback now require address/DR7
+slot-field readback. Regression checks cover reported-success sanitization,
+rollback, and all-four-slots-owned refusal. These are host checks, not a fix or
+live proof of data watchpoints. The 13.60 disable remains.
+
+The original `d80da62f...` record above is historical (209,304 bytes), not the
+identity of a newly built hardened payload. No follow-up console deployment is
+part of the docs/hardening work. Current operation instructions are in the
+[CLI runbook](DEBUGGER.md), [agent contract](DEBUGGER_AGENTS.md), and
+[protocol reference](DEBUGGER_PROTOCOL.md).
+
+### Hardened build (not deployed)
+
+The readback/ownership hardening source was built in a new isolated directory
+on gpubox: `/tmp/ps5-debugger-hardening-aRhzik`, using the same staged SDK and
+LLVM 18.1.8, through `make process-debugger check`. The debugger compiled without
+warnings and all **43** Python host tests plus the C paging checks passed.
+The legacy-flag rejection and sanitized-register rollback checks are included.
+
+Artifact: 210,272 bytes, SHA-256
+`3121031f6acd83fbc3e40c64e020f7cadfbaa38d0a603cd91c5644319cdab817`.
+This build has not been sent to the console. The older 209,304-byte
+`d80da62f...` artifact and run-007 evidence remain historical. No new live
+watchpoint, kernel breakpoint or cleanup claim follows from this build.

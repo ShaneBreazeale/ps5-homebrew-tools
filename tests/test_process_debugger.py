@@ -19,7 +19,7 @@ MOCK = r'''
 static struct reg mock_regs[2];
 static struct dbreg mock_db[2];
 static unsigned char mock_memory[1024];
-static int pending, attached, fail_set, sets, stepped[2], suspended[2];
+static int pending, attached, fail_set, corrupt_set, sets, stepped[2], suspended[2];
 static int mock_ptrace(int request, int id, caddr_t address, int data) {
     int i = id == 102 ? 1 : 0;
     switch(request) {
@@ -33,7 +33,9 @@ static int mock_ptrace(int request, int id, caddr_t address, int data) {
     case PT_GETDBREGS: *(struct dbreg*)address = mock_db[i]; return 0;
     case PT_SETDBREGS:
         if(++sets == fail_set) { errno = EIO; return -1; }
-        mock_db[i] = *(struct dbreg*)address; return 0;
+        mock_db[i] = *(struct dbreg*)address;
+        if(sets == corrupt_set) mock_db[i].dr[7] &= ~(15ul << 24);
+        return 0;
     case PT_LWPINFO: ((struct ptrace_lwpinfo*)address)->pl_lwpid = 101; return 0;
     case PT_GETREGS: *(struct reg*)address = mock_regs[i]; return 0;
     case PT_SETREGS: mock_regs[i] = *(struct reg*)address; return 0;
@@ -72,7 +74,7 @@ static void setup(void) {
     /* Slot 1 is owned by someone else and must survive all operations. */
     mock_db[0].dr[1] = mock_db[1].dr[1] = 0x9000;
     mock_db[0].dr[7] = mock_db[1].dr[7] = 0x4;
-    sets = fail_set = pending = attached = 0;
+    sets = fail_set = corrupt_set = pending = attached = 0;
 }
 static void unit_tests(void) {
     setup();
@@ -90,6 +92,14 @@ static void unit_tests(void) {
     assert(__builtin_memcmp(&before0, &mock_db[0], sizeof(before0)) == 0);
     assert(__builtin_memcmp(&before1, &mock_db[1], sizeof(before1)) == 0);
     fail_set = 0;
+    /* A successful setter that drops access/length bits must fail insertion
+     * and restore every thread already touched by the transaction. */
+    corrupt_set = sets + 2;
+    assert(breakpoint(1, 2, 0x2000, 8) == -EIO);
+    assert(!target.bp[2].used && !target.poisoned);
+    assert(__builtin_memcmp(&before0, &mock_db[0], sizeof(before0)) == 0);
+    assert(__builtin_memcmp(&before1, &mock_db[1], sizeof(before1)) == 0);
+    corrupt_set = 0;
     assert(breakpoint(1, 2, 0x2000, 8) == 0);
     assert(breakpoint(1, 4, 0x3000, 4) == 0);
     assert(breakpoint(1, 1, 0x4000, 1) == -ENOSPC);
@@ -105,7 +115,18 @@ static void unit_tests(void) {
     assert(!hwbreak_valid(1, 0x1000, 2));
     assert(!hwbreak_valid(2, 1ull << 47, 8));
     assert(hwbreak_control(&(struct hwbreak){0x1000, 2, 8, 1}, 0) == 0x90001);
-    puts("backend state/rollback assertions passed");
+    /* Occupied slots are ownership, not free capacity to borrow. */
+    setup();
+    mock_db[0].dr[7] = mock_db[1].dr[7] = 0x455;
+    assert(attach_process(4242) == 0);
+    before0 = mock_db[0]; before1 = mock_db[1];
+    int previous_sets = sets;
+    assert(breakpoint(1, 1, 0x1000, 1) == -ENOSPC);
+    assert(sets == previous_sets);
+    assert(__builtin_memcmp(&before0, &mock_db[0], sizeof(before0)) == 0);
+    assert(__builtin_memcmp(&before1, &mock_db[1], sizeof(before1)) == 0);
+    assert(detach_process() == 0);
+    puts("backend state/readback/ownership/rollback assertions passed");
 }
 int main(int argc, char** argv) {
     if(argc == 1) { unit_tests(); return 0; }
@@ -166,6 +187,7 @@ static pid_t mock_wait4(pid_t, int*, int, struct rusage*);''')
         process = process.replace("sys_exit", "_exit")
         src = folder / "process.c"
         src.write_text("#define PROCESS_DEBUGGER_TEST\n" + process + MOCK)
+        cls.source = src
         cls.exe = str(folder / "process")
         subprocess.run(["cc", "-D_GNU_SOURCE", "-w", "-I", str(PAYLOAD), "-I", str(ROOT / "vendor/prosper0gdb"), str(src), "-o", cls.exe], check=True)
         subprocess.run([cls.exe], check=True)
@@ -195,6 +217,13 @@ static pid_t mock_wait4(pid_t, int*, int, struct rusage*);''')
 
     def attach(self):
         self.assertTrue(self.request("vAttach;1092").startswith(b"T"))
+
+    def test_retired_pcb_flag_is_rejected(self):
+        result = subprocess.run(["cc", "-D_GNU_SOURCE", "-DPROCESS_DEBUGGER_KERNEL_DBREGS",
+            "-fsyntax-only", "-w", "-I", str(PAYLOAD), "-I", str(ROOT / "vendor/prosper0gdb"),
+            str(self.source)], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("direct PCB writes are not supported", result.stderr)
 
     def test_attach_threads_detach(self):
         self.attach()

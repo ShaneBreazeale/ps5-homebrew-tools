@@ -8,6 +8,8 @@ match historical binaries or support other consoles and firmware versions.
 
 | Component | Boundary |
 | --- | --- |
+| Kernel offset backend | PS5 Pro 13.60; exact resume cookie/profile and readable audited page; seven-byte exec-join inspection only, no traps or console validation. See [kernel backend](KERNEL_DEBUGGER.md). |
+| Process debugger | Usermode PID attach; child-only partial console evidence on Pro 13.60; free DR slots required; Z2/Z4 disabled on retail 13.60; no kernel breakpoints or direct PCB fallback. See [the debugger guide](DEBUGGER.md). |
 | Resident snapshot | A resident implementing `KEKCALL_SHARED_AREA_SNAPSHOT` with this exact snapshot layout |
 | Process watch / process snapshot | Firmware-specific raw `kinfo_proc` offsets, including PID 72, name 447, and thread count 596 |
 | thread-probe-v1 | Raw selector probing; unsupported selectors can return ENOENT |

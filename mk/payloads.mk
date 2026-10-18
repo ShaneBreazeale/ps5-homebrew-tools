@@ -52,7 +52,7 @@ CFLAGS += -Wall -Wextra
 define link_cleanup
 $(OBJCOPY) --remove-section=.comment $@
 endef
-TOOLS := process-debugger resident-snapshot process-watch process-snapshot thread-probe-v1 thread-probe-v2 kernel-capture capture-export
+TOOLS := kernel-offset process-debugger resident-snapshot process-watch process-snapshot thread-probe-v1 thread-probe-v2 kernel-capture capture-export
 
 .DELETE_ON_ERROR:
 .PHONY: all
@@ -65,7 +65,7 @@ out/resident-snapshot.elf: payloads/resident-snapshot/main.c vendor/kstuff/uelf/
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) -Ivendor -Ivendor/kstuff $(LDFLAGS) -o $@ $< $(LDLIBS)
 	$(link_cleanup)
 
-$(addprefix out/,$(addsuffix .elf,process-watch process-snapshot thread-probe-v1 thread-probe-v2 kernel-capture capture-export)): out/%.elf: payloads/%/main.c | out
+$(addprefix out/,$(addsuffix .elf,process-watch process-snapshot thread-probe-v1 thread-probe-v2 kernel-capture capture-export kernel-offset)): out/%.elf: payloads/%/main.c | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
 	$(link_cleanup)
 
@@ -78,3 +78,5 @@ out/minimal-payload.elf: templates/minimal-payload/main.c | out
 out/process-debugger.elf: payloads/process-debugger/main.c payloads/process-debugger/hwbreak.h vendor/prosper0gdb/rsp_transport.h vendor/prosper0gdb/trap_state.h | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
 	$(link_cleanup)
+
+out/kernel-offset.elf: payloads/kernel-offset/backend.h payloads/kernel-capture/paging.h payloads/kernel-capture/profile_13_60_pro.h

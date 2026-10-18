@@ -1,14 +1,35 @@
 {
   "$schema": "https://context7.com/schema/context7.json",
   "projectTitle": "PS5 Homebrew Tools",
-  "description": "PS5 homebrew diagnostic payloads, native app build tooling, and host utilities for capture, decoding, and offline analysis.",
+  "description": "PS5 homebrew diagnostic payloads, a usermode GDB debugger, a kernel offset inspection backend, CLI and GDB/MI runbooks, native app build tooling, and host analysis utilities.",
   "branch": "main",
-  "folders": ["docs", "host", "payloads", "templates"],
-  "excludeFolders": ["residents", "tests", "tooling", "vendor"],
+  "folders": [
+    "docs",
+    "host",
+    "payloads",
+    "templates"
+  ],
+  "excludeFolders": [
+    "residents",
+    "tests",
+    "tooling",
+    "vendor",
+    "captures",
+    "out",
+    "dist"
+  ],
   "excludeFiles": [],
   "rules": [
     "Check the compatibility guide before using a payload; kernel capture requires the matching PS5 Pro 13.60 instrumentation and page map.",
     "Distinguish a successful local build or host-side transfer from console runtime validation.",
-    "Send payloads once and preserve the raw capture and metadata sidecar; do not automatically retry after a timeout."
+    "Send payloads once and preserve the raw capture and metadata sidecar; do not automatically retry after a timeout.",
+    "For process-debugger tasks read DEBUGGER_RECOVERY, DEBUGGER_VALIDATION, DEBUGGER, DEBUGGER_AGENTS and DEBUGGER_PROTOCOL before live CLI work; current source and session evidence override stale snippets.",
+    "The process debugger attaches to one usermode PID and cannot trap kernel offset 0xcfc12; title IDs are not PIDs and arbitrary system/game attachment remains unvalidated.",
+    "Retail 13.60 Z2/Z4 data watchpoints remain disabled. PROCESS_DEBUGGER_KERNEL_DBREGS is retired and rejected; never deploy the historical PCB fallback into a kstuff session.",
+    "Hardware slots may already belong to kstuff. Preserve other owners and report ENOSPC; the test-child slot lease is not available for real applications.",
+    "Use one RSP client and bounded execution; source docs/debugger/compat.gdb before connecting. A successful register readback is not evidence that a watchpoint fires.",
+    "Preserve existing user authorization, identify the current target/session, log commands and cleanup state, and do not automatically resend, reconnect, kill or reboot after a timeout.",
+    "Keep LLVM 18 and the standard Payload SDK build; gpubox is the recorded workspace build host. Do not substitute LLVM 23 or a research-runtime ELF.",
+    "For kernel-offset work read KERNEL_DEBUGGER.md: exec+0xcfc12 = text+0x38fc12 = data-0x9303ee only in the checked profile. The separate SDK backend inspects gated bytes; it implements no kernel trap, watchpoint, stop, step or resume. A dated probe is not console readiness or whole-kernel identity."
   ]
 }

@@ -60,7 +60,17 @@ the source repository.
 
 ## Process debugger (2026-10-18)
 
-The standard gpubox LLVM 18.1.8 build and 42 host tests pass. Console tests
-confirmed child-process attachment, GP register/memory access, instruction
-stepping, and a hardware execution breakpoint. Data watchpoints and the full
-validation sequence remain incomplete; see [the detailed debugger record](DEBUGGER_VALIDATION.md).
+The hardened debugger builds with the standard gpubox LLVM 18.1.8 toolchain;
+43 host tests and the C paging checks pass. Historical console runs confirmed
+child-process attachment, GP register/memory access, instruction stepping and
+a hardware execution breakpoint. The hardened build has not been deployed.
+Data watchpoints and the full validation sequence remain incomplete; see
+[the detailed debugger record](DEBUGGER_VALIDATION.md) and [recovery constraints](DEBUGGER_RECOVERY.md).
+
+## Kernel offset inspection follow-up
+
+The separate kernel-offset backend was built with the standard SDK / LLVM
+18.1.8 on gpubox; all 50 Python host tests and the C paging checks passed.
+The [kernel backend build record](KERNEL_DEBUGGER.md#build-evidence--2026-10-18)
+records its exact hash, byte count, offline capture check and undeployed status.
+Kernel trapping, stepping and watchpoints remain unimplemented.

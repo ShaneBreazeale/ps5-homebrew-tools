@@ -3,7 +3,7 @@ PYTHON ?= python3
 HOST_CC ?= cc
 CONTAINER ?= docker
 CONTAINER_IMAGE ?= ps5-homebrew-tools-build
-TOOLS := process-debugger resident-snapshot process-watch process-snapshot thread-probe-v1 thread-probe-v2 kernel-capture capture-export minimal-payload
+TOOLS := kernel-offset process-debugger resident-snapshot process-watch process-snapshot thread-probe-v1 thread-probe-v2 kernel-capture capture-export minimal-payload
 
 .PHONY: help all checksums container-build check check-python check-paging native-check native-app clean bundle reader3 procwatch shellshot $(TOOLS)
 

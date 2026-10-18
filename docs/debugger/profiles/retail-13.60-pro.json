@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "id": "retail-13.60-pro-exec-join-v1",
+  "firmware_mask": "0xffff0000",
+  "firmware": "0x13600000",
+  "soc_id": "0x840fd0",
+  "dump_size": "0xcc0000",
+  "dump_sha256": "20da45a0910c990153fbfb7c94e16356867e0bd84f7c9fbf754a45a5dd129673",
+  "anchors": {"text": "0x0", "data": "0xcc0000", "exec": "0x2c0000"},
+  "sites": {
+    "exec-error-join": {
+      "text_offset": "0x38fc12",
+      "signature": "4c8d2df7c65803",
+      "instruction": "lea r13,[rip+0x358c6f7]",
+      "instruction_length": 7,
+      "boundary_evidence": "Matching captured-image disassembly; incoming branch at text+0x38fc0a targets text+0x38fc12.",
+      "observation": "Full r15, rax and [rbp-0x68] would distinguish the previous low-32-bit-only status observation. No trap or emulation is installed by this profile."
+    }
+  }
+}

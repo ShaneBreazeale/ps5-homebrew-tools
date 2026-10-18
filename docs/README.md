@@ -8,6 +8,8 @@ Commands in the guides run from the repository root unless stated otherwise.
 | Guide | Use it to |
 | --- | --- |
 | [Build reference](BUILDING.md) | Configure the SDK and select Make targets |
+| [Kernel offset backend](KERNEL_DEBUGGER.md) | Resolve explicit anchors and inspect a gated kernel instruction; no traps yet |
+| [Process debugger CLI](DEBUGGER.md) | Build, log, attach by PID, inspect, step and detach |
 | [Host utilities](../host/README.md) | Send once, preserve output, and summarize v2 captures |
 | [Process snapshot](../payloads/process-snapshot/README.md) | Take one filtered process snapshot |
 | [Process watch](../payloads/process-watch/README.md) | Watch process changes during an app launch |
@@ -33,5 +35,13 @@ Commands in the guides run from the repository root unless stated otherwise.
 - [Initial validation](VALIDATION.md): what was actually built and tested.
 - [Third-party notices](../THIRD_PARTY_NOTICES.md): imported code and license notices.
 
-- [Process debugger](../payloads/process-debugger/README.md) — GDB process tracing and its current limitations.
-- [Debugger validation](DEBUGGER_VALIDATION.md) — gpubox build and partial console evidence.
+## Debugger and LLM references
+
+- [Payload entry point](../payloads/process-debugger/README.md): current capability summary.
+- [CLI runbook](DEBUGGER.md): operational workflow and troubleshooting.
+- [Agent / GDB-MI guide](DEBUGGER_AGENTS.md): automation, evidence and cleanup state.
+- [Protocol reference](DEBUGGER_PROTOCOL.md): exact implemented packet subset.
+- [Recovery / kernel scope](DEBUGGER_RECOVERY.md): dated session facts and failed paths.
+- [Validation](DEBUGGER_VALIDATION.md): gpubox builds and partial console evidence.
+- [Root agent instructions](../AGENTS.md): repository-specific rules for coding agents.
+- [GDB compatibility profile](debugger/compat.gdb): local settings; makes no connection.

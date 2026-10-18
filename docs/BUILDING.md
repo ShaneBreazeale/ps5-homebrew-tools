@@ -67,8 +67,10 @@ that artifact. Builds made before these rules, for example with Homebrew LLVM
 | Command | Result |
 | --- | --- |
 | `make` or `make help` | Show targets without requiring an SDK |
-| `make all` | Compile all seven diagnostic payloads and the minimal payload |
+| `make all` | Compile both debugger/inspection tools, seven diagnostic payloads and the minimal payload |
 | `make resident-snapshot process-watch` | Compile selected payloads |
+| `make kernel-offset` | Build the kernel offset inspection payload; see [kernel backend](KERNEL_DEBUGGER.md) |
+| `make process-debugger` | Build the usermode GDB server; see [debugger runbook](DEBUGGER.md) |
 | `make process-snapshot` | Compile the one-shot process snapshot tool |
 | `make thread-probe-v1 thread-probe-v2` | Compile the raw collectors |
 | `make kernel-capture capture-export` | Build the collector and exporter |

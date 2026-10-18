@@ -1,102 +1,76 @@
 # Process debugger
 
-An all-stop GDB remote server for attaching to one process by PID. Built with
-the same Payload SDK, LLVM 18 requirement, reproducible flags, and startup code
-as the other homebrew-tools payloads. The default listener is TCP port 1234.
+Single-process **usermode** GDB remote server for PS5 homebrew. Built through
+the normal Payload SDK / LLVM 18 targets, with a default TCP listener at 1234.
+It is not a kernel debugger and cannot trap kernel offset `0xcfc12`.
 
-## Build and launch
+## Guides
 
-From the repository root with `PS5_PAYLOAD_SDK` and `LLVM_CONFIG` configured:
+| Guide | Contents |
+| --- | --- |
+| [CLI runbook](../../docs/DEBUGGER.md) | Build on gpubox, deploy once, log, attach, inspect, step, use hardware execution breakpoints, detach |
+| [LLM / CLI / GDB-MI contract](../../docs/DEBUGGER_AGENTS.md) | Session facts, bounded automation, MI state handling, evidence handoff |
+| [Packet reference](../../docs/DEBUGGER_PROTOCOL.md) | Actual RSP subset, GP layout, identifiers, custom packets, limits and errors |
+| [Recovery and kernel scope](../../docs/DEBUGGER_RECOVERY.md) | Offline console, kstuff slot ownership, Chain Test constraints, retired PCB fallback |
+| [Validation record](../../docs/DEBUGGER_VALIDATION.md) | Exact historical builds, failed runs, successful child-only checks and remaining work |
+| [Context7 guide](../../docs/CONTEXT7.md) | Confirmed library ID, retrieval prompts, indexing rules |
+
+## Current status
+
+Historical PS5 Pro 13.60 tests passed child-process attachment, GP register and
+memory read/write/restore, instruction stepping, and a hardware execution trap
+using slots leased only in our own disposable child. The full console validator
+has never passed. A stock GDB/MI client, arbitrary system/game attachment,
+multithread execution and complete disconnect/resume cleanup remain unvalidated.
+
+Data watchpoints Z2/Z4 did not fire in the earlier 13.60 tests and remain
+explicitly disabled there. **They are not fixed.** The source now checks address/
+DR7 readback and rollback after ptrace updates; those checks detect dropped state
+but do not prove a trap. Occupied DR slots are preserved and produce ENOSPC.
+There is no automatic kstuff-slot takeover.
+
+The direct PCB debug-register writer has been removed. The old
+`PROCESS_DEBUGGER_KERNEL_DBREGS` flag now causes a compile error. Do not deploy
+the historical run-007 fallback into a kstuff session. The latest operator
+report is that the console is offline; see the dated recovery note before
+planning any live action.
+
+## Build and local checks
 
 ```sh
+# Set PS5_PAYLOAD_SDK and LLVM_CONFIG to the supported LLVM 18 SDK build first.
 make process-debugger
-python3 host/send_payload.py out/process-debugger.elf --host "$PS5_HOST" \
-  --log captures/process-debugger-001.log --idle-timeout 60
+make check
+make checksums
 ```
 
-The sender's idle timeout leaves a running server alive. Do not resend merely
-because its log connection timed out. `make all` and `make bundle` also include
-the debugger; no separate research checkout or runtime is needed.
+The result is `out/process-debugger.elf`. `make all` and `make bundle` include
+it. The workspace's usual build host is gpubox; exact recorded paths are in the
+validation guide. Do not substitute the research runtime or LLVM 23 build.
 
-Use a GDB build supporting x86-64:
+## Client setup
+
+After a separately authorized, ready server deployment, start `gdb -nx -q` from
+the repository root and source the local compatibility settings:
 
 ```gdb
-set architecture i386:x86-64
-file /path/to/matching/unstripped/target.elf
-target extended-remote CONSOLE_ADDRESS:1234
-attach TARGET_PID
-info threads
-info registers
-x/10i $pc
-stepi
-hbreak *TARGET_ADDRESS
-continue
-detach
+source docs/debugger/compat.gdb
 ```
 
-Supply the target's relocated symbol addresses for ASLR. The server does not
-currently discover module mappings or load shared-library symbols. The ELF
-above is the target's ELF, not the debugger payload. These GDB commands describe
-the supported protocol; a stock GDB client has not yet been tested live.
+This profile makes no connection. Follow the CLI guide to set fresh logs,
+connect with `target extended-remote`, and attach the current numeric PID.
+Do not pass title IDs, historical PIDs, raw kernel offsets or kernel addresses.
+Default port 1234 is distinct from the loader's default port 9021.
 
-## Implemented behavior and limits
-
-- `vAttach`, detach, thread enumeration/selection, GP register access, memory
-  access, single-step, continue, Ctrl-C, and target exit replies.
-- `Z1`/`z1` hardware execution breakpoints. Free slots only: existing debug
-  allocations are preserved. All current LWPs are updated transactionally;
-  saved registers are restored on detach, including disconnect cleanup.
-- `Z2` and `Z4` write/access watchpoint handlers and DR7 encoding. **Disabled
-  on retail 13.60 in the default build because data watchpoints did not fire in
-  live validation.** The experimental kernel fallback can be compiled with
-  `CPPFLAGS=-DPROCESS_DEBUGGER_KERNEL_DBREGS`; it is not console-validated.
-- Four hardware slots total, shared with existing debug-register owners.
-  `Z3` read-only watchpoints and `Z0` software breakpoints are unsupported.
-- One process, at most 256 threads. New threads receive breakpoint state at the
-  next observed stop; creation while running is not yet intercepted. Only one
-  vCont action is supported. FP/vector registers and signal-delivery resume
-  commands are not implemented.
-- System applications can impose additional PS5 AppContext restrictions;
-  arbitrary system/game attachment has not been validated. PID 1 and the
-  server itself are rejected.
-
-The server follows the SDK's `test_privileges` sample: temporarily set the
-caller authid/capabilities, issue raw ptrace, then restore credentials. It does
-not use the SDK libc ptrace stub, which returned 1 without attaching during
-console testing. Failed restoration blocks further use and is retried during
-connection cleanup. Attach and cleanup waits are bounded; failed detach keeps
-the server alive so exiting cannot implicitly kill a tracee.
-
-The experimental PCB fallback is gated to PS5 Pro 13.60. It verifies proc/thread
-ownership, TID and PCB pointers, and requires exactly one six-register save
-area matching ptrace readback before writing. Its latest ELF was sent but did
-not report startup before the console stopped responding; no successful live
-fallback run is claimed. The cause of the loss of connectivity is unknown.
-
-## Validation
+## Console validation command
 
 ```sh
-make check
-python3 host/validate_debugger.py --host "$PS5_HOST" \
-  --elf out/process-debugger.elf --report captures/debugger-validation-001.json
+# Live, state-changing test of the server's own disposable child; not a probe.
+python3 host/validate_debugger.py --host "$PS5_HOST"   --elf out/process-debugger.elf --report captures/debugger-validation-NEW.json
 ```
 
-The console validator creates its own disposable child. It tests attach,
-register/memory read-write-restore, stepping, breakpoints, detach/resume, and
-reconnect. `qPS5:test-hardware` borrows inherited slots only for this child;
-original state is retained for restoration. Arbitrary targets cannot use that
-command. Reports are created exclusively and retain commands/replies and the
-payload hash, including failed runs.
-
-Current evidence: SDK/LLVM 18.1.8 builds on gpubox; host protocol/state tests
-pass. Live PS5 Pro 13.60 tests passed attachment, GP register and memory
-read/write/restore, instruction stepping, and a hardware execution breakpoint.
-The full validator has **not passed**: data watchpoints, disconnect cleanup,
-and the experimental kernel path remain unvalidated. See
-[debugger validation](../../docs/DEBUGGER_VALIDATION.md).
-
-Custom diagnostic packets: `qPS5:dbregs`, `qPS5:spawn-test`,
-`qPS5:test-hardware`, `qPS5:finish-test`, and `qPS5:shutdown` (requires no attached
-process or test child). `vKill;PID` explicitly terminates the attached target.
-
-Protocol: https://sourceware.org/gdb/current/onlinedocs/gdb.html/Packets.html
+Use this only in an authorized current session, without another GDB client.
+The report is created exclusively and preserves replies/hash. The full suite
+currently fails on the known-disabled retail 13.60 data-watchpoint path; that
+expected failure is not justification to enable a PCB writer or resend a payload.
+No live execution is needed to validate a documentation change.

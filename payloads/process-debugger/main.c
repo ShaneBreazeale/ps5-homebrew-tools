@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* A ptrace process backend using the existing stub's packet transport.
- * Separate from ring-0 debugging: never writes kernel IDT/TSS/debug registers.
+ * Usermode debugging only. Kernel access is used by SDK credential helpers;
+ * debug-register state is managed through ptrace, never direct PCB writes.
  */
 #include "../../vendor/prosper0gdb/rsp_transport.h"
 #include "../../vendor/prosper0gdb/trap_state.h"
@@ -14,6 +15,10 @@
 #include <sys/wait.h>
 #include <time.h>
 #include "hwbreak.h"
+
+#ifdef PROCESS_DEBUGGER_KERNEL_DBREGS
+#error "PROCESS_DEBUGGER_KERNEL_DBREGS was retired; direct PCB writes are not supported"
+#endif
 
 #define MAX_THREADS 256
 #define MAX_PACKET 4096
@@ -100,36 +105,6 @@ static int restore_credentials(void)
     return 0;
 }
 #endif
-#ifndef PROCESS_DEBUGGER_TEST
-int sceKernelGetMainSocId(void);
-static int kernel_address(uint64_t p) { return p >> 48 == 0xffff && !(p & 7); }
-/* Locate, never assume, the 13.60 PCB save area. Every candidate must match
- * all six registers returned by ptrace for this stopped, verified LWP. */
-static int locate_dbregs(int tid, const struct dbreg* reference, intptr_t* location)
-{
-    if((kernel_get_fw_version() & 0xffff0000u) != 0x13600000u ||
-       sceKernelGetMainSocId() != 0x840fd0) return -ENOTSUP;
-    intptr_t proc = kernel_get_proc(target.pid);
-    intptr_t td = kernel_get_proc_thread(target.pid, tid), pcb = 0, owner = 0;
-    uint32_t actual_tid = 0;
-    if(!kernel_address(proc) || !kernel_address(td) ||
-       kernel_copyout(td+8, &owner, 8) || owner != proc ||
-       kernel_copyout(td+0x9c, &actual_tid, 4) || actual_tid != (unsigned)tid ||
-       kernel_copyout(td+0x3f8, &pcb, 8) || !kernel_address(pcb)) return -EFAULT;
-    uint64_t area[24];
-    if(kernel_copyout(pcb+0x60, area, sizeof(area))) return -EFAULT;
-    int found = 0;
-    for(int i = 0; i <= 18; i++) {
-        int matches = 1;
-        for(int j = 0; j < 6; j++) {
-            int reg = j < 4 ? j : j+2;
-            if(area[i+j] != reference->dr[reg]) matches = 0;
-        }
-        if(matches) { *location = pcb+0x60+8*i; found++; }
-    }
-    return found == 1 ? 0 : -EFAULT;
-}
-#endif
 static int call(int request, int id, void* address, int data)
 {
 #ifdef PROCESS_DEBUGGER_TEST
@@ -147,49 +122,29 @@ static int call(int request, int id, void* address, int data)
     int r = -1, error = EACCES;
     if(!kernel_set_ucred_authid(self, 0x4800000000010003ull) &&
        !kernel_set_ucred_caps(self, elevated)) {
-        intptr_t db_location = 0;
-        struct dbreg before;
-        int kernel_db = 0;
-        if(request == PT_SETDBREGS &&
-#ifdef PROCESS_DEBUGGER_KERNEL_DBREGS
-           1 &&
-#else
-           0 &&
-#endif
-           (kernel_get_fw_version() & 0xffff0000u) == 0x13600000u &&
-           sceKernelGetMainSocId() == 0x840fd0) {
-            if((int)__syscall(SYS_ptrace, PT_GETDBREGS, id, &before, 0) < 0 ||
-               locate_dbregs(id, &before, &db_location)) {
-                error = EFAULT;
-                goto restore;
-            }
-            kernel_db = 1;
-        }
         r = request == -1 ? (int)__syscall(SYS_kill, id, data) :
             (int)__syscall(SYS_ptrace, request, id, address, data);
         error = errno;
-        if(r == 0 && kernel_db) {
-            struct dbreg* wanted = address;
-            uint64_t desired[6], observed[6];
-            for(int k = 0; k < 4; k++) desired[k] = wanted->dr[k];
-            /* Keep architectural reserved DR6 bits; force DR7's fixed bit. */
-            desired[4] = (wanted->dr[6] & 0xe00full) | 0xffff0ff0ull;
-            desired[5] = wanted->dr[7] | 0x400;
-            if(kernel_copyin(desired, db_location, sizeof(desired)) ||
-               kernel_copyout(db_location, observed, sizeof(observed)) ||
-               __builtin_memcmp(desired, observed, sizeof(desired))) {
-                uint64_t rollback[6];
-                for(int k = 0; k < 6; k++) rollback[k] = before.dr[k < 4 ? k : k+2];
-                if(kernel_copyin(rollback, db_location, sizeof(rollback))) target.poisoned = 1;
-                r = -1; error = EIO;
-            }
-        }
         if(request == PT_ATTACH && r == 0) raw_attach_succeeded = 1;
     }
-restore:
     if(restore_credentials()) return -EIO;
     return r < 0 ? -(error ? error : EIO) : r;
 #endif
+}
+/* PT_SETDBREGS returning success is insufficient: some kernels can sanitize
+ * state. Verify addresses and all slot enable/access/length fields, ignoring
+ * reserved DR7 bits and stale DR6 status. Callers own rollback on failure. */
+static int write_dbregs_checked(int tid, const struct dbreg* desired)
+{
+    int r = call(PT_SETDBREGS, tid, (void*)desired, 0);
+    if(r) return r < 0 ? r : -EIO;
+    struct dbreg actual;
+    r = call(PT_GETDBREGS, tid, &actual, 0);
+    if(r) return r < 0 ? r : -EIO;
+    for(int k = 0; k < 4; k++)
+        if(actual.dr[k] != desired->dr[k]) return -EIO;
+    if((actual.dr[7] ^ desired->dr[7]) & 0xffff00fful) return -EIO;
+    return 0;
 }
 static int signal_process(pid_t pid, int sig)
 {
@@ -274,16 +229,16 @@ static int apply_breakpoints(void)
         }
         if(result < 0) break;
         next.dr[6] = 0;
-        result = call(PT_SETDBREGS, target.threads[i].id, &next, 0);
+        result = write_dbregs_checked(target.threads[i].id, &next);
         if(result < 0) {
             /* A failed syscall may still have touched the current thread. */
-            if(call(PT_SETDBREGS, target.threads[i].id, &before[i], 0) < 0)
+            if(write_dbregs_checked(target.threads[i].id, &before[i]) < 0)
                 target.poisoned = 1;
             break;
         }
     }
     if(result < 0) while(i-- > 0)
-        if(call(PT_SETDBREGS, target.threads[i].id, &before[i], 0) < 0)
+        if(write_dbregs_checked(target.threads[i].id, &before[i]) < 0)
             target.poisoned = 1;
     return result < 0 ? result : 0;
 }
@@ -395,7 +350,7 @@ static int detach_process(void)
     }
     if((r = restore_thread_control()) < 0) return r;
     for(int i = 0; i < target.count; i++)
-        if((r = call(PT_SETDBREGS, target.threads[i].id, &target.threads[i].original, 0)) < 0) return r;
+        if((r = write_dbregs_checked(target.threads[i].id, &target.threads[i].original)) < 0) return r;
     if((r = call(PT_DETACH, target.pid, (void*)1, 0)) < 0) return r;
     __builtin_memset(&target, 0, sizeof(target));
     return 0;
@@ -458,7 +413,7 @@ static int breakpoint(int insert, unsigned type, unsigned long long addr, unsign
 {
     if(type == 0 || type == 3 || type > 4) return 1; /* unsupported */
     if(!hwbreak_valid(type, addr, len)) return -EINVAL;
-#if !defined(PROCESS_DEBUGGER_TEST) && !defined(PROCESS_DEBUGGER_KERNEL_DBREGS)
+#if !defined(PROCESS_DEBUGGER_TEST)
     /* The retail 13.60 data-watchpoint path did not pass console validation.
      * Never accept a watchpoint that is known not to fire through ptrace. */
     if(type != 1 && (kernel_get_fw_version() & 0xffff0000u) == 0x13600000u)

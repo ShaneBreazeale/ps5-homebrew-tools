@@ -1,55 +1,61 @@
 # PS5 Homebrew Tools
 
-Diagnostic payloads and host utilities for developing PS5 homebrew. Capture
-process changes, inspect thread snapshots, and read instrumented kstuff logs
-from one independently buildable repository.
+Console diagnostics and host utilities for PS5 homebrew development. Watch
+processes during an app launch, capture thread records, and inspect logs from
+an instrumented kstuff resident.
 
-This is an initial source collection. The diagnostics were used during PS5 Pro
-firmware 13.60 research; newly built artifacts still need console validation.
+**Status:** initial source collection, based on PS5 Pro firmware 13.60 research.
+All included payloads compile locally; the standalone builds still need console
+validation. See [compatibility](docs/COMPATIBILITY.md) and
+[validation results](docs/VALIDATION.md) before running them.
 
 ## Features
 
-| Tool | Purpose | Requirements |
-| --- | --- | --- |
-| [reader3](payloads/reader3/README.md) | Three snapshots of kstuff counters and event rings, one second apart | Resident exposing the matching 6,200-byte snapshot ABI |
-| [procwatch](payloads/procwatch/README.md) | Process births, disappearances, and zombie transitions over 180 seconds | Firmware process-record layout matching the 13.60 research |
-| [shellshot](payloads/shellshot/README.md) | One snapshot of shell, system, and app-related processes | Same process-record layout |
-| [thread-probe-v1](payloads/thread-probe-v1/README.md) | Raw sysctl process and selector captures | Compatible sysctl interface |
-| [thread-probe-v2](payloads/thread-probe-v2/README.md) | Bounded kernel thread captures with live layout checks | Firmware 13.60, SoC `0x840fd0`, and SDK kernel-read support |
-| `send_payload.py` | Send an ELF once and save raw output | A running ELF loader, usually on port 9021 |
-| `summarize_threads.py` | Validate and summarize a completed v2 capture | Python 3.9+; no console connection |
+Choose a tool for the question you want to answer:
 
-The [resident catalogue](residents/README.md) preserves what xlog, rdlog, xin,
-xslot, and xapp measured. Their recovered patch scripts are archived separately
-from buildable payloads.
+| Tool | Use it to |
+| --- | --- |
+| [Shellshot](payloads/shellshot/README.md) | Take one snapshot of shell and app-related processes |
+| [Procwatch](payloads/procwatch/README.md) | Watch process births, disappearances, and zombie transitions over three minutes |
+| [Reader3](payloads/reader3/README.md) | Read three snapshots of counters and event rings from a matching instrumented kstuff resident |
+| [Thread probe v1](payloads/thread-probe-v1/README.md) | Capture raw sysctl records and check which selectors are available |
+| [Thread probe v2](payloads/thread-probe-v2/README.md) | Capture selected processes' kernel thread records on firmware 13.60, SoC `0x840fd0` |
+
+The [host utilities](host/README.md) send payloads, preserve raw output, and turn
+completed v2 thread captures into JSON summaries. The
+[minimal payload template](templates/minimal-payload/README.md) provides a starting
+point for your own diagnostic.
+
+Historical resident variants—xlog, rdlog, xin, xslot, and xapp—are documented in
+[Resident experiments](residents/README.md). Recovered patches are archived there;
+resident builds are not included in the tool targets.
 
 ## Installation
 
-Use a local checkout or download and extract this repository's source. The
-repository currently provides source; it has no published binary release or
-automatic console installer.
+You need Python 3.9+, Make, and the public
+[PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk) with its host LLVM
+prerequisites. Python utilities use the standard library. Follow the
+[build guide](docs/BUILDING.md) for SDK and LLVM configuration.
 
-Install Python 3.9+, Make, and the public
-[PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk). Host utilities use only
-the Python standard library. SDK installation and LLVM configuration are
-described in [Building](docs/BUILDING.md).
-
-From the repository root:
+From a checkout or extracted source directory:
 
 ```sh
 export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk
-make all
+make shellshot procwatch
 ```
 
-ELF files are written to `out/`. To build selected tools:
-
-```sh
-make reader3 procwatch
-```
+Built ELF files appear in `out/`. Use `make all` to build every included payload,
+including the starter template. Builds do not upload or run anything on the
+console. Prebuilt downloads and an automatic console installer are not yet
+provided.
 
 ## Usage
 
-Set your console address and create a directory for local captures:
+Your console must already have a working homebrew environment and a reachable
+ELF loader. Replace the address below with your console's address; the sender
+uses port `9021` by default.
+
+### Take a process snapshot
 
 ```sh
 export PS5_HOST=your-console-address
@@ -58,67 +64,52 @@ python3 host/send_payload.py out/shellshot.elf \
   --host "$PS5_HOST" --log captures/shellshot-001.log
 ```
 
-For a launch window, start procwatch before opening the app:
+Look for `shellshot: ready`, the process records, and
+`shellshot: complete procs=...`. Received output is displayed in the terminal and
+saved to the log.
+
+### Watch an app launch
 
 ```sh
 python3 host/send_payload.py out/procwatch.elf \
   --host "$PS5_HOST" --idle-timeout 240 --log captures/procwatch-001.log
 ```
 
-For an existing v2 thread capture:
+Wait for the baseline before opening the app. The watch runs for 180 seconds and
+ends with `procwatch: complete births=... deaths=...`.
 
-```sh
-python3 host/summarize_threads.py captures/thread-probe-v2.log \
-  > captures/thread-summary.json
-```
-
-Every send requires a new log filename. The sender opens one connection, sends
-once, and never retries or probes the loader. An idle timeout returns exit code
-2 and preserves partial output; it does not prove the payload stopped.
-
-Read [Compatibility](docs/COMPATIBILITY.md) before choosing a payload. In
-particular, reader3 requires matching resident instrumentation; an ordinary
-kstuff build is not sufficient.
-
-The sender's exit code describes the host connection, not the payload's return
-code. Check the tool's readiness, completion, and error output in the capture.
-The [Getting started guide](docs/GETTING_STARTED.md) walks through that first run.
+Use a new log filename for every run. The sender sends once and never retries.
+Its exit status describes the host connection; check the payload's output for
+completion. A timeout can leave the payload running. See the
+[host reference](host/README.md) for options, exit codes, and offline summaries.
 
 ## Documentation
 
-Start with the [documentation index](docs/README.md), or choose a guide:
-
-- [Getting started](docs/GETTING_STARTED.md): build, capture, and check a first run.
-- [Build reference](docs/BUILDING.md): SDK configuration and Make targets.
-- [Host utilities](host/README.md): command options, exit codes, and JSON summaries.
-- [Troubleshooting](docs/TROUBLESHOOTING.md): build, connection, and capture problems.
-- [Architecture](docs/ARCHITECTURE.md): payloads, host tools, logging, and residents.
-- [Compatibility](docs/COMPATIBILITY.md): firmware gates and interpretation limits.
-- [Resident experiments](residents/README.md): profiles, archived scripts, and event layouts.
-
-## Start a new payload
-
-Copy [the minimal payload template](templates/minimal-payload/README.md) to start
-a standalone SDK project. It prints readiness, its PID, and completion. A native
-TV app template and app packaging tools are future additions.
+- [Getting started](docs/GETTING_STARTED.md) — first build, capture, and result check.
+- [Build reference](docs/BUILDING.md) — SDK configuration and available targets.
+- [Troubleshooting](docs/TROUBLESHOOTING.md) — build failures, connection issues, and incomplete captures.
+- [Documentation index](docs/README.md) — all tool guides, architecture, compatibility, and source provenance.
 
 ## Development
 
 ```sh
-make check
+make help     # List build and test targets
+make check    # Run host tests without an SDK or console
 ```
 
-Host tests require no SDK or console. `make all` compiles payloads without sending
-them. Build output and local captures are ignored by Git.
+Generated binaries and local captures are ignored by Git. To start a new tool,
+copy the [minimal payload template](templates/minimal-payload/README.md); it builds
+independently of this repository.
 
 ## Contributing
 
-See [Contributing](CONTRIBUTING.md) for adding tools and
-[Provenance](docs/PROVENANCE.md) for import hashes and validation boundaries.
+See [Contributing](CONTRIBUTING.md) for adding tools, documenting compatibility,
+and recording verification. Preserve source identities and distinguish build
+results from console testing.
 
 ## License
 
-New repository code and the diagnostics carrying GPL notices use
-GPL-3.0-or-later; see [COPYING](COPYING). Imported files retain their own notices
-and provenance. See [Third-party notices](THIRD_PARTY_NOTICES.md) for the BSD
-header and the imported kstuff files' licensing status.
+New repository code and diagnostics carrying GPL notices use GPL-3.0-or-later;
+see [COPYING](COPYING). Imported files retain their own notices. The
+[third-party notices](THIRD_PARTY_NOTICES.md) cover the BSD header and the imported
+kstuff files' licensing status.

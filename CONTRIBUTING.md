@@ -17,3 +17,19 @@ event meanings explicit rather than guessing a decoder from a marker alone.
 Do not commit `out/`, local captures, SDK installations, kernel dumps, or console
 binaries. Resident modifications belong in versioned upstream patches or a
 dedicated fork once a reproducible baseline has been recovered.
+
+## Document a tool
+
+Add `payloads/<name>/README.md` beside its source. Include the build target,
+root-relative command examples, firmware/model checks, required resident or SDK
+features, output fields, completion/error markers, and interpretation limits.
+Distinguish the payload's return value from the sender's transport status.
+
+Link new guides from both the root README and [documentation index](docs/README.md).
+Keep examples consistent with actual source constants and command-line options.
+If a capability is archived or planned, label its status rather than describing
+it as an available build target.
+
+For documentation changes, check local links and documented `--help`/Make
+commands. Avoid console execution merely to validate a prose change. Update
+[compatibility notes](docs/COMPATIBILITY.md) when source changes alter assumptions.

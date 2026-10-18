@@ -43,6 +43,17 @@ SDK bootstrap is not included in this initial import.
 All root-build artifacts go into `out/`. Override `CFLAGS`, `CPPFLAGS`,
 `LDFLAGS`, and `LDLIBS` using Make variables if needed.
 
+For example, a build with explicit optimization flags:
+
+```sh
+make clean
+make procwatch CFLAGS='-O2 -g -Wall -Wextra'
+```
+
+Make tracks source/header timestamps, not SDK installation or compiler-flag
+changes. Clean first when changing the SDK, compiler, or build settings so an
+existing ELF is not mistaken for a new build.
+
 The standalone template has its own Makefile and can be built after copying it
 outside this repository. Resident experiment archives are never executed by
 these targets.

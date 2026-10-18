@@ -11,11 +11,11 @@ firmware 13.60 research; newly built artifacts still need console validation.
 
 | Tool | Purpose | Requirements |
 | --- | --- | --- |
-| `reader3` | Three snapshots of kstuff counters and event rings, one second apart | Resident exposing the matching 6,200-byte snapshot ABI |
-| `procwatch` | Process births, disappearances, and zombie transitions over 180 seconds | Firmware process-record layout matching the 13.60 research |
-| `shellshot` | One snapshot of shell, system, and app-related processes | Same process-record layout |
-| `thread-probe-v1` | Raw sysctl process and selector captures | Compatible sysctl interface |
-| `thread-probe-v2` | Bounded kernel thread captures with live layout checks | SDK kernel-read support and the researched kernel layout |
+| [reader3](payloads/reader3/README.md) | Three snapshots of kstuff counters and event rings, one second apart | Resident exposing the matching 6,200-byte snapshot ABI |
+| [procwatch](payloads/procwatch/README.md) | Process births, disappearances, and zombie transitions over 180 seconds | Firmware process-record layout matching the 13.60 research |
+| [shellshot](payloads/shellshot/README.md) | One snapshot of shell, system, and app-related processes | Same process-record layout |
+| [thread-probe-v1](payloads/thread-probe-v1/README.md) | Raw sysctl process and selector captures | Compatible sysctl interface |
+| [thread-probe-v2](payloads/thread-probe-v2/README.md) | Bounded kernel thread captures with live layout checks | Firmware 13.60, SoC `0x840fd0`, and SDK kernel-read support |
 | `send_payload.py` | Send an ELF once and save raw output | A running ELF loader, usually on port 9021 |
 | `summarize_threads.py` | Validate and summarize a completed v2 capture | Python 3.9+; no console connection |
 
@@ -24,6 +24,10 @@ xslot, and xapp measured. Their recovered patch scripts are archived separately
 from buildable payloads.
 
 ## Installation
+
+Use a local checkout or download and extract this repository's source. The
+repository currently provides source; it has no published binary release or
+automatic console installer.
 
 Install Python 3.9+, Make, and the public
 [PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk). Host utilities use only
@@ -75,6 +79,22 @@ once, and never retries or probes the loader. An idle timeout returns exit code
 Read [Compatibility](docs/COMPATIBILITY.md) before choosing a payload. In
 particular, reader3 requires matching resident instrumentation; an ordinary
 kstuff build is not sufficient.
+
+The sender's exit code describes the host connection, not the payload's return
+code. Check the tool's readiness, completion, and error output in the capture.
+The [Getting started guide](docs/GETTING_STARTED.md) walks through that first run.
+
+## Documentation
+
+Start with the [documentation index](docs/README.md), or choose a guide:
+
+- [Getting started](docs/GETTING_STARTED.md): build, capture, and check a first run.
+- [Build reference](docs/BUILDING.md): SDK configuration and Make targets.
+- [Host utilities](host/README.md): command options, exit codes, and JSON summaries.
+- [Troubleshooting](docs/TROUBLESHOOTING.md): build, connection, and capture problems.
+- [Architecture](docs/ARCHITECTURE.md): payloads, host tools, logging, and residents.
+- [Compatibility](docs/COMPATIBILITY.md): firmware gates and interpretation limits.
+- [Resident experiments](residents/README.md): profiles, archived scripts, and event layouts.
 
 ## Start a new payload
 

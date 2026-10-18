@@ -22,7 +22,6 @@
 #define PID_OFFSET 72u
 #define ALL_THREADS 0
 #define PROC_ONLY 8
-#define PID_WITH_THREADS 17
 #define PATHNAME 12
 
 /* Same app-info layout as the SDK's samples/ps/main.c. Oversize the
@@ -294,26 +293,11 @@ int main(void) {
             if (rc)
                 return 3;
         } else {
-            /* Some firmware restricts KERN_PROC_ALL. Process-only discovery
-             * followed by per-PID thread queries uses the same sysctl API. */
-            p = query(PROC_ONLY, 0, &n);
-            if (!p)
-                return 4;
-            int rc = print_records("procs", p, n, 0, pids, &pid_count);
-            free(p);
-            if (rc)
-                return 5;
-            for (size_t i = 0; i < pid_count; ++i) {
-                char tag[48];
-                snprintf(tag, sizeof(tag), "pid-%d-%d", pids[i], pass);
-                p = query(PID_WITH_THREADS, pids[i], &n);
-                if (p) {
-                    rc = print_records(tag, p, n, 1, NULL, NULL);
-                    free(p);
-                    if (rc)
-                        return 6;
-                }
-            }
+            /* v2 already discovers processes with PROC_ONLY and reads threads
+             * from the kernel, so v1's per-PID sysctl fallback has nothing to
+             * fall back to. Without all-N records the capture is unusable. */
+            printf("snapshot pass=%d process_query_failed\n", pass);
+            return 4;
         }
         if (pass == 0) {
             for (size_t i = 0; i < pid_count; ++i) {

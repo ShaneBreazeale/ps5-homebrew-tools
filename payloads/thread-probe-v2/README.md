@@ -63,6 +63,7 @@ interpretations with `_candidate` and retains the 256-thread cap limitation.
 The implementation performs no explicit kernel writes, hooks, or debug-register
 changes; it uses the SDK runtime for kernel access.
 
-Payload return values 1–6 describe query/record failures, 7 the firmware/model
+Payload return values 1–4 describe query/record failures (4: a pass could not list
+processes, logged as `process_query_failed`), 7 the firmware/model
 gate, and 0 completion of the main capture. The host sender does not return those
 values. See [Host utilities](../../host/README.md) for JSON fields and parser errors.

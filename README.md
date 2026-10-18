@@ -93,6 +93,7 @@ completion. A timeout can leave the payload running. See the
 - [Native app](docs/NATIVE_APP.md), [capture tools](docs/CAPTURE_TOOLS.md), [log tools](docs/LOG_TOOLS.md), and [analysis tools](docs/ANALYSIS_TOOLS.md).
 - [Troubleshooting](docs/TROUBLESHOOTING.md) — build failures, connection issues, and incomplete captures.
 - [Documentation index](docs/README.md) — all tool guides, architecture, compatibility, and source provenance.
+- [Context7 guide](docs/CONTEXT7.md) — index these docs for coding agents.
 
 ## Development
 

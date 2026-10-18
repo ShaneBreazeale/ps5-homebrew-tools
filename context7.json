@@ -1,0 +1,14 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "PS5 Homebrew Tools",
+  "description": "PS5 homebrew diagnostic payloads, native app build tooling, and host utilities for capture, decoding, and offline analysis.",
+  "branch": "main",
+  "folders": ["docs", "host", "payloads", "templates"],
+  "excludeFolders": ["residents", "tests", "tooling", "vendor"],
+  "excludeFiles": [],
+  "rules": [
+    "Check the compatibility guide before using a payload; kernel capture requires the matching PS5 Pro 13.60 instrumentation and page map.",
+    "Distinguish a successful local build or host-side transfer from console runtime validation.",
+    "Send payloads once and preserve the raw capture and metadata sidecar; do not automatically retry after a timeout."
+  ]
+}

@@ -23,6 +23,7 @@ Commands in the guides run from the repository root unless stated otherwise.
 ## Understand and extend the repository
 
 - [Architecture](ARCHITECTURE.md): component boundaries and capture flow.
+- [Context7 guide](CONTEXT7.md): index and use the maintained tool docs.
 - [Compatibility](COMPATIBILITY.md): supported baseline and interpretation limits.
 - [Minimal native app](../templates/minimal-app/README.md): start a controller-based app.
 - [Minimal payload](../templates/minimal-payload/README.md): start a new ELF tool.

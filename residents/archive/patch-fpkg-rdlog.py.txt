@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""Log the first post-flip reads. Do not install debug registers."""
+from pathlib import Path
+
+root = Path("/home/shane/stage0-build/kstuff-lite/ps5-kstuff/uelf")
+fpkg = root / "fpkg.c"
+header = root / "fpkg.h"
+main = root / "main.c"
+Path("/tmp/fpkg.c.drzero").write_text(fpkg.read_text())
+Path("/tmp/fpkg.h.drzero").write_text(header.read_text())
+Path("/tmp/main.c.drzero").write_text(main.read_text())
+
+text = fpkg.read_text()
+old_flag = """static int ppr_plain_read_watch;
+static int ppr_plain_read_logged;
+static int ppr_plain_drzero_logged;
+"""
+new_flag = """static int ppr_plain_read_watch;
+static int ppr_plain_read_logged;
+static int ppr_plain_read_logs;
+"""
+old_arm = """int arm_ppr_plaintext_decrypt_wait(uint64_t* regs)
+{
+    if(__atomic_load_n(&ppr_plain_read_watch, __ATOMIC_ACQUIRE))
+    {
+        /* DR7 is zero, so no breakpoint can fire. The 12-qword return
+         * frame is still pushed on every read after the ekey flip.
+         * The first entry logs PPRDRZ01 from syscall entry. */
+        if(!__atomic_exchange_n(&ppr_plain_drzero_logged, 1, __ATOMIC_ACQ_REL))
+        {
+#if KSTUFF_OBS
+            log_word(0x50505244525A3031ull); /* "PPRDRZ01" */
+#endif
+        }
+        uint64_t dbgregs[6] = { 0, 0, 0, 0, 0, 0 };
+        start_syscall_with_dbgregs(regs, dbgregs);
+        return 1;
+    }
+"""
+new_arm = """static void note_ppr_read_syscall(uint64_t* regs, int kind)
+{
+    uint64_t frame;
+    uint64_t args[R10 + 1];
+    int n;
+    (void)kind;
+    if(FWVER != 0x1360)
+        return;
+    n = __atomic_fetch_add(&ppr_plain_read_logs, 1, __ATOMIC_RELAXED);
+    if(n >= 4)
+        return;
+#if KSTUFF_OBS
+    /* kind is 1 read, 2 readv, 3 pread, 4 preadv. The low half of the
+     * second word is the fd. The third word is the byte count, or the
+     * iovec count for readv and preadv. The fourth word is r10, which
+     * is the pread/preadv offset. */
+    log_word(0x5050525244303031ull); /* "PPRRD001" */
+    if(kpeek64_checked(regs[RDI] + td_frame, &frame)
+    || copy_from_kernel(args, frame, sizeof(args)))
+    {
+        log_word((uint64_t)kind << 32);
+        log_word(0);
+        log_word(0);
+        return;
+    }
+    log_word(((uint64_t)kind << 32) | (uint32_t)args[RDI]);
+    log_word(args[RDX]);
+    log_word(args[R10]);
+#endif
+}
+
+int arm_ppr_plaintext_decrypt_wait(uint64_t* regs, int read_kind)
+{
+    if(__atomic_load_n(&ppr_plain_read_watch, __ATOMIC_ACQUIRE))
+    {
+        /* The ekey flip has happened. Log the syscall and leave the
+         * read on the relemu3 path: no debug registers, no return frame. */
+        note_ppr_read_syscall(regs, read_kind);
+        return 0;
+    }
+"""
+for old, new, name in ((old_flag, new_flag, "flag"), (old_arm, new_arm, "arm")):
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f"fpkg {name} count {count}")
+    text = text.replace(old, new, 1)
+assert text.count("if(FWVER > 0x1360)") == 1
+assert "if(FWVER > 0x1160)" not in text
+assert "PPRDRZ01" not in text
+assert text.count("PPRRD001") == 1
+assert text.count("ppr_plain_read_logs") == 2
+assert "start_syscall_with_dbgregs(regs, dbgregs)" in text
+watch = text.split("ppr_plain_read_watch", 2)[-1]
+# The watch arm itself must not install debug registers.
+arm_head = text.split("int arm_ppr_plaintext_decrypt_wait", 1)[1].split("uint64_t decrypt_wait", 1)[0]
+assert "start_syscall_with_dbgregs" not in arm_head
+assert "return 0" in arm_head
+assert "CryptAsync" in text
+fpkg.write_text(text)
+
+htext = header.read_text()
+old_h = "int arm_ppr_plaintext_decrypt_wait(uint64_t* regs);\n"
+new_h = "int arm_ppr_plaintext_decrypt_wait(uint64_t* regs, int read_kind);\n"
+if htext.count(old_h) != 1:
+    raise SystemExit("header count")
+header.write_text(htext.replace(old_h, new_h, 1))
+
+mtext = main.read_text()
+old_m = """    /* Read syscalls arm their own breakpoints. After the 13.60 ekey flip
+     * that is the plain-reader call and the mov that follows it. The older
+     * decrypt-wait arm still applies only while a plaintext pair is
+     * outstanding. */
+    if(IS(read) || IS(readv) || IS(preadv) || IS(pread))
+    {
+        if(arm_ppr_plaintext_decrypt_wait(regs))
+            RETURN_HANDLE_SYSCALL();
+    }
+"""
+new_m = """    /* After the 13.60 ekey flip, reads only log. They do not install
+     * debug registers. The decrypt-wait arm still applies while a
+     * plaintext pair is outstanding. */
+    if(IS(read) || IS(readv) || IS(preadv) || IS(pread))
+    {
+        int kind = 4;
+        if(IS(read))
+            kind = 1;
+        else if(IS(readv))
+            kind = 2;
+        else if(IS(pread))
+            kind = 3;
+        if(arm_ppr_plaintext_decrypt_wait(regs, kind))
+            RETURN_HANDLE_SYSCALL();
+    }
+"""
+if mtext.count(old_m) != 1:
+    raise SystemExit("main count")
+main.write_text(mtext.replace(old_m, new_m, 1))
+print("patched")

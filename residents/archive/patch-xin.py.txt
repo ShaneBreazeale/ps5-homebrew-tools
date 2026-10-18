@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+"""relemu3+notrophy: xpath pin plus first in-scope unmount (kind 2 or 4).
+Skip kind=0 so the bound of one cannot hide a later PPR/GAME unmount.
+Does not overwrite /tmp/nmx-restore. No PPRNMX01/PPREXE01.
+"""
+import pathlib
+import shutil
+
+root = pathlib.Path("/home/shane/stage0-build/kstuff-lite")
+pairs = {
+    "fpkg.c": root / "ps5-kstuff/uelf/fpkg.c",
+    "fpkg.h": root / "ps5-kstuff/uelf/fpkg.h",
+    "uelf-main.c": root / "ps5-kstuff/uelf/main.c",
+    "syscall_fixes.c": root / "ps5-kstuff/uelf/syscall_fixes.c",
+    "ldr-main.c": root / "ps5-kstuff-ldr/src/main.c",
+}
+
+for p in ("/tmp/fpkg.c.relemu3", "/tmp/fpkg.h.drzero", "/tmp/main.c.drzero"):
+    if not pathlib.Path(p).is_file():
+        raise SystemExit("missing " + p)
+
+shutil.copy2("/tmp/fpkg.c.relemu3", pairs["fpkg.c"])
+shutil.copy2("/tmp/fpkg.h.drzero", pairs["fpkg.h"])
+shutil.copy2("/tmp/main.c.drzero", pairs["uelf-main.c"])
+print("installed relemu3 sources")
+
+h = pairs["fpkg.h"].read_text()
+needle = "int arm_ppr_plaintext_decrypt_wait(uint64_t* regs);\n"
+if needle not in h:
+    raise SystemExit("fpkg.h missing one-arg wait decl")
+h = h.replace(
+    needle,
+    needle
+    + "void note_ppr_exec_path(const char* path);\n"
+    + "void note_ppr_post_mount_unmount(void);\n",
+)
+pairs["fpkg.h"].write_text(h)
+print("patched fpkg.h")
+
+c = pairs["fpkg.c"].read_text()
+old_ok = """        int ok = (object >> 48) == 0xffff
+              && !copy_u32_to_kernel(object + 0x38, 0xffffffffu);
+#if KSTUFF_OBS
+        log_word(0x505052454b583031ull); /* "PPREKX01" */
+        log_word(object);
+        log_word(ok);
+#endif
+    }
+}"""
+new_ok = """        int ok = (object >> 48) == 0xffff
+              && !copy_u32_to_kernel(object + 0x38, 0xffffffffu);
+        if(ok)
+        {
+            uint64_t td = 0;
+            int rc = get_current_ppr_thread(&td);
+            if(rc || !td)
+                td = 0;
+            s_handshake = 1;
+            s_post_mount = (!rc && td) ? 1 : 0;
+#if KSTUFF_OBS
+            log_word(0x505052454b583031ull); /* "PPREKX01" */
+            log_word((uint64_t)(int32_t)rc);
+            log_word(td);
+            log_word((uint64_t)s_post_mount);
+#endif
+        }
+#if KSTUFF_OBS
+        else
+        {
+            log_word(0x505052454b583031ull); /* "PPREKX01" */
+            log_word(object);
+            log_word(ok);
+        }
+#endif
+    }
+}"""
+if old_ok not in c:
+    raise SystemExit("PPREKX ok block not found")
+c = c.replace(old_ok, new_ok, 1)
+
+anchor = "static void try_emulate_plaintext_cleanup_put(uint64_t* regs, int cmac)\n"
+if anchor not in c:
+    raise SystemExit("cleanup put anchor missing")
+c = c.replace(
+    anchor,
+    "static int s_handshake;\n"
+    "static int s_post_mount;\n"
+    "static int s_pinned;\n"
+    "static int s_unmount_logged;\n\n" + anchor,
+    1,
+)
+
+note_fn = r"""
+void note_ppr_exec_path(const char* path)
+{
+#if KSTUFF_OBS
+    uint64_t words[2];
+    if(s_pinned || !path)
+        return;
+    if(memcmp(path, "/app0/eboot.bin", 16))
+        return;
+    memset(words, 0, sizeof(words));
+    memcpy(words, path, 16);
+    log_word(0x5050524558563031ull); /* "PPREXV01" */
+    log_word(words[0]);
+    log_word(words[1]);
+    s_pinned = 1;
+#else
+    (void)path;
+#endif
+}
+
+void note_ppr_post_mount_unmount(void)
+{
+#if KSTUFF_OBS
+    uint64_t td = 0;
+    uint64_t kind = 0;
+    if(!s_handshake || s_unmount_logged)
+        return;
+    if(!get_current_ppr_thread(&td) && td)
+        kind = fpkg_scope_for_thread(td) & FPKG_SCOPE_KIND_MASK;
+    else
+        td = 0;
+    if(kind != KSTUFF_FPKG_SCOPE_GAME_UNMOUNT
+    && kind != KSTUFF_FPKG_SCOPE_PPR_UNMOUNT)
+        return;
+    s_unmount_logged = 1;
+    log_word(0x505052554d583031ull); /* "PPRUMX01" */
+    log_word(td);
+    log_word((uint64_t)s_pinned);
+    log_word(kind);
+#endif
+}
+
+"""
+if "void handle_fpkg_syscall(" not in c:
+    raise SystemExit("handle_fpkg_syscall missing")
+c = c.replace("void handle_fpkg_syscall(", note_fn + "void handle_fpkg_syscall(", 1)
+pairs["fpkg.c"].write_text(c)
+print("patched fpkg.c")
+
+m = pairs["uelf-main.c"].read_text()
+old_um = """    if(IS(unmount))
+    {
+        int is_ppr = 0;
+        if(!current_fpkg_syscall_scope(0, &is_ppr))
+            RETURN_HANDLE_SYSCALL();
+"""
+new_um = """    if(IS(unmount))
+    {
+        int is_ppr = 0;
+        note_ppr_post_mount_unmount();
+        if(!current_fpkg_syscall_scope(0, &is_ppr))
+            RETURN_HANDLE_SYSCALL();
+"""
+if old_um not in m:
+    raise SystemExit("unmount block missing")
+m = m.replace(old_um, new_um, 1)
+pairs["uelf-main.c"].write_text(m)
+print("patched uelf main.c")
+
+sf = pairs["syscall_fixes.c"].read_text()
+if '#include "fpkg.h"' not in sf:
+    sf = sf.replace('#include "syscall_fixes.h"\n', '#include "syscall_fixes.h"\n#include "fpkg.h"\n', 1)
+old_path = """    if(copy_current_thread_from_pcpu_cached(&td) || !td
+    || copy_u64_from_kernel(&proc, td + td_proc) || !proc
+    || copy_u64_from_kernel(&imgp_proc, imgp) || imgp_proc != proc
+    || copy_u64_from_kernel(&path_ptr, imgp + 0x78) || !path_ptr
+    || copy_from_kernel(path, path_ptr, sizeof(path))
+    || memcmp(path, "/app0/eboot.bin", sizeof(path)))
+        return;
+"""
+new_path = """    if(copy_current_thread_from_pcpu_cached(&td) || !td
+    || copy_u64_from_kernel(&proc, td + td_proc) || !proc
+    || copy_u64_from_kernel(&imgp_proc, imgp) || imgp_proc != proc
+    || copy_u64_from_kernel(&path_ptr, imgp + 0x78) || !path_ptr
+    || copy_from_kernel(path, path_ptr, sizeof(path)))
+        return;
+    note_ppr_exec_path(path);
+    if(memcmp(path, "/app0/eboot.bin", sizeof(path)))
+        return;
+"""
+if old_path not in sf:
+    raise SystemExit("aslr path copy missing")
+sf = sf.replace(old_path, new_path, 1)
+pairs["syscall_fixes.c"].write_text(sf)
+print("patched syscall_fixes.c")
+
+ldr = pairs["ldr-main.c"].read_text()
+old_trophy = "    start_shellui_patch_thread();\n"
+new_trophy = '    /* start_shellui_patch_thread(); */\n    puts("shellui trophy patch skipped");\n'
+if old_trophy not in ldr:
+    raise SystemExit("trophy call missing")
+if ldr.count(old_trophy) != 1:
+    raise SystemExit("trophy call not unique")
+ldr = ldr.replace(old_trophy, new_trophy, 1)
+pairs["ldr-main.c"].write_text(ldr)
+print("patched ldr")
+
+text = pairs["fpkg.c"].read_text()
+assert "PPREXV01" in text and "PPREKX01" in text and "PPRUMX01" in text
+assert "fpkg_scope_for_thread" in text
+assert "KSTUFF_FPKG_SCOPE_GAME_UNMOUNT" in text
+assert "KSTUFF_FPKG_SCOPE_PPR_UNMOUNT" in text
+assert "if(kind != KSTUFF_FPKG_SCOPE_GAME_UNMOUNT" in text
+assert "PPREXE01" not in text
+assert "PPRNMX01" not in text
+assert "PPRRD001" not in text
+print("sanity passed")

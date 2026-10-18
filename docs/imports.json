@@ -1,0 +1,107 @@
+{
+  "origin": "https://github.com/EchoStretch/kstuff-lite",
+  "local_checkpoint": "47da23b70685651a475d20247a3c4f2cac433eb4",
+  "note": "Files copied from the working tree, including untracked files. The checkpoint alone does not reproduce every import. Original and imported bytes are recorded per file.",
+  "files": [
+    {
+      "path": "payloads/procwatch/main.c",
+      "source": "research/kstuff-lite/diagnostics/1360-20261017/procwatch.c",
+      "source_sha256": "0d0d1d47ef3c50290e2a869546c7402eeb34c2119ab43bb2f695eac2187796d5",
+      "changes": [],
+      "import_sha256": "0d0d1d47ef3c50290e2a869546c7402eeb34c2119ab43bb2f695eac2187796d5"
+    },
+    {
+      "path": "payloads/shellshot/main.c",
+      "source": "research/kstuff-lite/diagnostics/1360-20261017/shellshot.c",
+      "source_sha256": "0bd0fb7bc7fa2229818d697dd8e1a04d48025fb5a4233509e517316143ef548e",
+      "changes": [],
+      "import_sha256": "0bd0fb7bc7fa2229818d697dd8e1a04d48025fb5a4233509e517316143ef548e"
+    },
+    {
+      "path": "payloads/thread-probe-v1/main.c",
+      "source": "research/kstuff-lite/diagnostics/1360-20261017/thread_probe_v1.c",
+      "source_sha256": "836d4a5b67dd2fc87e45c2b5b8b7dbede1df1c03929356171fa25edf9e9dd242",
+      "changes": [],
+      "import_sha256": "836d4a5b67dd2fc87e45c2b5b8b7dbede1df1c03929356171fa25edf9e9dd242"
+    },
+    {
+      "path": "payloads/thread-probe-v2/main.c",
+      "source": "research/kstuff-lite/diagnostics/1360-20261017/thread_probe_v2.c",
+      "source_sha256": "7d66ca708a76eaed397ca94b7c0665a3d3f54a66c4bc4b8f7a9a2c45ec58ef5f",
+      "changes": [],
+      "import_sha256": "7d66ca708a76eaed397ca94b7c0665a3d3f54a66c4bc4b8f7a9a2c45ec58ef5f"
+    },
+    {
+      "path": "host/summarize_threads.py",
+      "source": "research/kstuff-lite/diagnostics/1360-20261017/summarize_threads.py",
+      "source_sha256": "17f48ecee1754c6954526a98593a74fa46a609cbf43bf3f51b8a2a181e5fbb6f",
+      "changes": [],
+      "import_sha256": "17f48ecee1754c6954526a98593a74fa46a609cbf43bf3f51b8a2a181e5fbb6f"
+    },
+    {
+      "path": "payloads/reader3/main.c",
+      "source": "research/kstuff-lite/ps5-kstuff/debug-reader.c",
+      "source_sha256": "be152899f8f807633bdea7c55f003bf129276203f1fd8dbd47f52fca9a36e7ff",
+      "changes": [
+        "Changed the ioctl header include path for the standalone vendor directory."
+      ],
+      "import_sha256": "d6be38505da0d6922f577096ae7b8fd80255f86e71fa37121768ba8d18ff83a9"
+    },
+    {
+      "path": "vendor/kstuff/uelf/shared_area.h",
+      "source": "research/kstuff-lite/ps5-kstuff/uelf/shared_area.h",
+      "source_sha256": "5bb3b10925605bc94fcdcbae7b2be995bd9e64b4f72f870e1113e945855f003d",
+      "changes": [],
+      "import_sha256": "5bb3b10925605bc94fcdcbae7b2be995bd9e64b4f72f870e1113e945855f003d"
+    },
+    {
+      "path": "vendor/kstuff/uelf/fself.h",
+      "source": "research/kstuff-lite/ps5-kstuff/uelf/fself.h",
+      "source_sha256": "f900f47482112e53ee4802e8054d606d7381cda620209ae065c6aaae0bd162d4",
+      "changes": [],
+      "import_sha256": "f900f47482112e53ee4802e8054d606d7381cda620209ae065c6aaae0bd162d4"
+    },
+    {
+      "path": "vendor/kstuff/uelf/syscall_fixes.h",
+      "source": "research/kstuff-lite/ps5-kstuff/uelf/syscall_fixes.h",
+      "source_sha256": "5cfe31a88dd9bac858743f8e800243cec21d6d1e1363fdc44019b66aabfbc725",
+      "changes": [],
+      "import_sha256": "5cfe31a88dd9bac858743f8e800243cec21d6d1e1363fdc44019b66aabfbc725"
+    },
+    {
+      "path": "vendor/freebsd/sys/ioccom.h",
+      "source": "research/kstuff-lite/freebsd-headers/sys/ioccom.h",
+      "source_sha256": "2fa02e7c917936a57ec2fe87588966a6962e9245888ae76d287af2c7626e76c8",
+      "changes": [],
+      "import_sha256": "2fa02e7c917936a57ec2fe87588966a6962e9245888ae76d287af2c7626e76c8"
+    },
+    {
+      "path": "residents/archive/patch-xin.py.txt",
+      "source": "temporary patch script: patch-xin.py",
+      "source_sha256": "9ac3c86b69c1bffb83ce36a34967a86cb40a481f082fad0165675f05a9f23e64",
+      "changes": [],
+      "import_sha256": "9ac3c86b69c1bffb83ce36a34967a86cb40a481f082fad0165675f05a9f23e64"
+    },
+    {
+      "path": "residents/archive/patch-xslot.py.txt",
+      "source": "temporary patch script: patch-xslot.py",
+      "source_sha256": "828e9eae99df32a40f6d2a5828b7d4316f92ed780a60c705e4059a081c815068",
+      "changes": [],
+      "import_sha256": "828e9eae99df32a40f6d2a5828b7d4316f92ed780a60c705e4059a081c815068"
+    },
+    {
+      "path": "residents/archive/patch-xapp.py.txt",
+      "source": "temporary patch script: patch-xapp.py",
+      "source_sha256": "9ae47411036ca1d3c4c6c427faa6f0488303b4daaa56e500c1fdf34b09f0872d",
+      "changes": [],
+      "import_sha256": "9ae47411036ca1d3c4c6c427faa6f0488303b4daaa56e500c1fdf34b09f0872d"
+    },
+    {
+      "path": "residents/archive/patch-fpkg-rdlog.py.txt",
+      "source": "temporary patch script: patch-fpkg-rdlog.py",
+      "source_sha256": "c833c2673b1e0b605d7926b8af00896cd81506c52090fef766bd94e6992cff37",
+      "changes": [],
+      "import_sha256": "c833c2673b1e0b605d7926b8af00896cd81506c52090fef766bd94e6992cff37"
+    }
+  ]
+}

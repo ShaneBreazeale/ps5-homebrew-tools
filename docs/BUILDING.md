@@ -32,22 +32,28 @@ SDK bootstrap is not included in this initial import.
 | Command | Result |
 | --- | --- |
 | `make` or `make help` | Show targets without requiring an SDK |
-| `make all` | Compile all five diagnostic payloads and the minimal payload |
-| `make reader3 procwatch` | Compile selected payloads |
-| `make shellshot` | Compile the one-shot process snapshot tool |
+| `make all` | Compile all seven diagnostic payloads and the minimal payload |
+| `make resident-snapshot process-watch` | Compile selected payloads |
+| `make process-snapshot` | Compile the one-shot process snapshot tool |
 | `make thread-probe-v1 thread-probe-v2` | Compile the raw collectors |
+| `make kernel-capture capture-export` | Build the collector and exporter |
+| `make bundle` | Build payloads and package source, binaries, and SHA-256 inventory |
+| `python3 tooling/native/build.py` | Build the native app folder and ZIP; see [native app](NATIVE_APP.md) |
 | `make minimal-payload` | Compile the starter payload |
 | `make check` | Run host tests without an SDK or console |
 | `make clean` | Remove generated payload files |
 
-All root-build artifacts go into `out/`. Override `CFLAGS`, `CPPFLAGS`,
+All root-build artifacts go into `out/`. `make bundle` writes
+`dist/ps5-homebrew-tools.tar.gz` and refuses to replace an existing archive.
+The archive contains source, built ELFs, `manifest.json`, and `SHA256SUMS`;
+keep the manifest with binaries when sharing builds. Override `CFLAGS`, `CPPFLAGS`,
 `LDFLAGS`, and `LDLIBS` using Make variables if needed.
 
 For example, a build with explicit optimization flags:
 
 ```sh
 make clean
-make procwatch CFLAGS='-O2 -g -Wall -Wextra'
+make process-watch CFLAGS='-O2 -g -Wall -Wextra'
 ```
 
 Make tracks source/header timestamps, not SDK installation or compiler-flag

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "id": "read-entry-v1",
+  "historical_profile": "rdlog",
+  "provenance": "residents/archive/patch-fpkg-rdlog.py.txt",
+  "description": "Partial schema recovered from the archived rdlog patch for PS5 Pro 13.60. Match producing artifact/profile explicitly; this does not describe every inherited baseline event.",
+  "ring_capacity_words": 16,
+  "events": {
+    "PPRRD001": {
+      "name": "read_entry",
+      "fields": [
+        "kind_fd",
+        "count",
+        "offset"
+      ],
+      "interpretation": "read_entry"
+    }
+  },
+  "ambiguous_markers": {}
+}

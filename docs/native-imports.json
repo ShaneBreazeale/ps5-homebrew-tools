@@ -1,0 +1,107 @@
+[
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/app-symbols.map",
+    "destination": "tooling/native/app-symbols.map",
+    "source_sha256": "8f695993837067b03e1b071e0d9e819f6014d3dc8b87390c6b6fce24855db7a3"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/app_cpp_runtime.cpp",
+    "destination": "tooling/native/app_cpp_runtime.cpp",
+    "source_sha256": "7379cd8df8f41af0e1a178c9300992f2235f3a3f8b910171caf91608568dac67"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/app_crt.cpp",
+    "destination": "tooling/native/app_crt.cpp",
+    "source_sha256": "a99fe406e36d8ce82e68e0245898ba064e28a56a9853f746e9cf13d23cc17a00"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/elf_object.cpp",
+    "destination": "tooling/native/elf_object.cpp",
+    "source_sha256": "2fc0f25fb67e1dd1b1a7c91e78e7ae191a1d08f95b9ac4047c6a252606077ae9"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/elf_object.hpp",
+    "destination": "tooling/native/elf_object.hpp",
+    "source_sha256": "fc12dd8f98cfb282cad5b0a541338e49b8ccbb87006a89cc5fff05ea4fe3aacb"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/hash.hpp",
+    "destination": "tooling/native/hash.hpp",
+    "source_sha256": "f76621a0d649f0920debbe813cc562498aa478d5c503de73b66e7cf4db9d4e5d"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/libc_builder.cpp",
+    "destination": "tooling/native/libc_builder.cpp",
+    "source_sha256": "fb9e4eb66ef6c1d9e9bcfd059a3a3aaf86156fe065838303a0c3fbd789786a1a"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/native_app_builder.cpp",
+    "destination": "tooling/native/native_app_builder.cpp",
+    "source_sha256": "b975e8ad177f0f1e039f70ef4e055bf71040cb26a6469307af392be1693acb18"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/ps5-pie.ld",
+    "destination": "tooling/native/ps5-pie.ld",
+    "source_sha256": "9b39cbea346cc686b40ffdd0d06da72de7f796dcac5238b2d4d76d1287b68ba0"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/runtime/api-surface.txt",
+    "destination": "tooling/native/runtime/api-surface.txt",
+    "source_sha256": "d9a81aec01f077817c35f3225f8325126bd63fd077a57734454a1868f6b25052"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/runtime/imports.txt",
+    "destination": "tooling/native/runtime/imports.txt",
+    "source_sha256": "ef8f04e17c355495ee8120ef28b1648f7d4380eb5b9baeb7ab50034ffacfe8ea"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/sce_module_writer.cpp",
+    "destination": "tooling/native/sce_module_writer.cpp",
+    "source_sha256": "96b33b545b517a751ab4eaf53abebe3bde7019b1f5c09957be88830269a6a5b5"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/sce_module_writer.hpp",
+    "destination": "tooling/native/sce_module_writer.hpp",
+    "source_sha256": "b80586c50b72b7ff4160c0944903390299f723ad7629b4ccb162275d1023761d"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/self_container.cpp",
+    "destination": "tooling/native/self_container.cpp",
+    "source_sha256": "3c028f6523b4c169e8b909cb2722187f13eea1487a5848c1d191693a854bb695"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/native/self_container.hpp",
+    "destination": "tooling/native/self_container.hpp",
+    "source_sha256": "c06a754fb6897b816154a598cdc7413dcbb2260baed54e00d8e854bbed9b7100"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tooling/prospero-clang18",
+    "destination": "tooling/native/prospero-clang18",
+    "source_sha256": "15dd5f73472f5a1cfed9e974f550bddf1cec5f2136ec5ffe062a764b1c45b48a"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/runtime/libc.prx.sha256",
+    "destination": "tooling/native/libc.prx.sha256",
+    "source_sha256": "087f9423317dd831939ab74e0e0168c91f2685d44bf616d8df72e298beeff17e"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/src/platform/ps5/pad.cpp",
+    "usage": "reference for adapted starter/build pipeline",
+    "source_sha256": "93b2b365af4153eb9c3714b81f76905cca278acd6038374d0d1d17bfe60d5619"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/sce_sys/param.json",
+    "usage": "reference for adapted starter/build pipeline",
+    "source_sha256": "c69d3d5e12a8160f51c1859bf3379e24b935302ce4b3a7bf36368bbb63674eac"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tools/build.sh",
+    "usage": "reference for adapted starter/build pipeline",
+    "source_sha256": "3fda38ce17f7aac79cefdf98ad90455197861191d9c3a0eccbd73222891808b2"
+  },
+  {
+    "source": "orbit-source/orbit-store-1.3.5/app/tools/rebuild-libc.sh",
+    "usage": "reference for adapted starter/build pipeline",
+    "source_sha256": "125cafc07be36699db9f69933f91f59dc41bb597c591105051cbf402e02150d5"
+  }
+]

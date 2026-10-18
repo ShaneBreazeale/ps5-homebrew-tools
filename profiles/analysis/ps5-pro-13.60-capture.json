@@ -1,0 +1,17 @@
+{
+  "name": "PS5 Pro 13.60 kernel text capture (2026-10-16)",
+  "note": "Addresses describe the original capture, not every console or boot. Override mapping for a different capture. Symbols retain their source table names.",
+  "base": "0xffffffff8d640000",
+  "origin": "0xffffffff8e300000",
+  "size": "0xcc0000",
+  "checks": {
+    "mov_rax_cr0": "0f20c0",
+    "mov_rax_cr3": "0f20d8",
+    "mov_cr3_rax_mov_ds": "0f22d8",
+    "rdmsr_start": "0f32",
+    "wrmsr_ret": "0f30c3",
+    "doreti_iret": "48cf",
+    "rep_movsb_pop_rbp_ret": "f3a45dc3",
+    "store_rax_rdi": "488907"
+  }
+}

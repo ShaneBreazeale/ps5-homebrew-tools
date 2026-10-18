@@ -1,4 +1,6 @@
-# Shellshot
+# process-snapshot
+
+Public build name: `process-snapshot`. Historical alias: `shellshot`. Existing output prefixes are preserved.
 
 Take one sysctl process snapshot and print entries whose names contain `Shell`,
 `SysCore`, `eboot`, `NK`, `kstuff`, or `payload`. Use it to check which shell and
@@ -9,9 +11,9 @@ app-related processes remain after a launch.
 From the repository root, with `PS5_PAYLOAD_SDK` and `PS5_HOST` set:
 
 ```sh
-make shellshot
+make process-snapshot
 mkdir -p captures
-python3 host/send_payload.py out/shellshot.elf \
+python3 host/send_payload.py out/process-snapshot.elf \
   --host "$PS5_HOST" --log captures/shellshot-001.log
 ```
 
@@ -33,7 +35,7 @@ including entries that did not match the name filter. It is not the number of
 printed `proc` lines.
 
 The snapshot captures a moment in time. A missing process may have exited before
-the query or may not match the filter; use [procwatch](../procwatch/README.md) to
+the query or may not match the filter; use [procwatch](../process-watch/README.md) to
 observe changes over a launch window.
 
 ## Compatibility and failures

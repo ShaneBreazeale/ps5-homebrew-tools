@@ -23,10 +23,10 @@ From the repository root, point to your SDK installation:
 
 ```sh
 export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk
-make shellshot
+make process-snapshot
 ```
 
-The result is `out/shellshot.elf`. If the SDK needs an explicit LLVM path, set
+The result is `out/process-snapshot.elf`. If the SDK needs an explicit LLVM path, set
 `LLVM_CONFIG` as described in [Building](BUILDING.md).
 
 To start with the template instead, use `make minimal-payload` and send
@@ -40,7 +40,7 @@ Replace `your-console-address` with the actual address:
 ```sh
 export PS5_HOST=your-console-address
 mkdir -p captures
-python3 host/send_payload.py out/shellshot.elf \
+python3 host/send_payload.py out/process-snapshot.elf \
   --host "$PS5_HOST" --port 9021 --log captures/shellshot-001.log
 ```
 
@@ -58,12 +58,12 @@ the payload's output to determine whether its work completed.
 
 | Question | Next step |
 | --- | --- |
-| Which processes appear or disappear during a launch? | [Procwatch](../payloads/procwatch/README.md); wait for its baseline before launching |
-| What did the already-loaded instrumented resident record? | [Reader3](../payloads/reader3/README.md); confirm its snapshot ABI first |
+| Which processes appear or disappear during a launch? | [Process watch](../payloads/process-watch/README.md); wait for its baseline before launching |
+| What did the already-loaded instrumented resident record? | [Resident snapshot](../payloads/resident-snapshot/README.md); confirm its snapshot ABI first |
 | Which sysctl selectors return useful data? | [Thread probe v1](../payloads/thread-probe-v1/README.md) |
 | What thread records remain in the researched 13.60 environment? | [Thread probe v2](../payloads/thread-probe-v2/README.md) |
 
-Keep app launch timing and resident identity alongside the capture. Procwatch
+Keep app launch timing and resident identity alongside the capture. Process watch
 and thread probes are separate payloads; this repository does not orchestrate
 concurrent diagnostic runs.
 

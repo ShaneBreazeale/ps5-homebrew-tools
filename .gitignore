@@ -5,3 +5,4 @@ __pycache__/
 /captures/
 /dist/
 /templates/minimal-payload/out/
+/templates/minimal-app/out/

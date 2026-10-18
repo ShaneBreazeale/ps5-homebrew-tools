@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "app-info-v1",
+  "historical_profile": "xapp",
+  "provenance": "residents/archive/patch-xapp.py.txt",
+  "description": "Partial schema recovered from the archived xapp patch for PS5 Pro 13.60. Match producing artifact/profile explicitly; this does not describe every inherited baseline event.",
+  "ring_capacity_words": 16,
+  "events": {
+    "PPREXV01": {
+      "name": "executable_path",
+      "fields": [
+        "path_word_0",
+        "path_word_1"
+      ],
+      "interpretation": "path_le"
+    },
+    "PPRUMX01": {
+      "name": "scoped_unmount",
+      "fields": [
+        "thread",
+        "pinned",
+        "scope_kind"
+      ]
+    },
+    "PPRWRF01": {
+      "name": "app_info_action",
+      "fields": [
+        "copy_status",
+        "appinfo_pointer",
+        "action"
+      ]
+    }
+  },
+  "ambiguous_markers": {
+    "PPREKX01": "The same marker has two payload words on failure and three on success; no unambiguous discriminator is recorded."
+  }
+}

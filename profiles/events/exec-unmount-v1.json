@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "id": "exec-unmount-v1",
+  "historical_profile": "xin",
+  "provenance": "residents/archive/patch-xin.py.txt",
+  "description": "Partial schema recovered from the archived xin patch for PS5 Pro 13.60. Match producing artifact/profile explicitly; this does not describe every inherited baseline event.",
+  "ring_capacity_words": 16,
+  "events": {
+    "PPREXV01": {
+      "name": "executable_path",
+      "fields": [
+        "path_word_0",
+        "path_word_1"
+      ],
+      "interpretation": "path_le"
+    },
+    "PPRUMX01": {
+      "name": "scoped_unmount",
+      "fields": [
+        "thread",
+        "pinned",
+        "scope_kind"
+      ]
+    }
+  },
+  "ambiguous_markers": {
+    "PPREKX01": "The same marker has two payload words on failure and three on success; no unambiguous discriminator is recorded."
+  }
+}

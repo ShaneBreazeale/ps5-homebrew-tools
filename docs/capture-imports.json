@@ -1,0 +1,27 @@
+[
+  {
+    "source": "research/fpkg-capture/fetch_dump.c",
+    "destination": "payloads/capture-export/main.c",
+    "source_sha256": "679505d7430dccac3637205f19e885098797946125eacd60cd6a54dca2a0ab00"
+  },
+  {
+    "source": "research/fpkg-capture/collector.c",
+    "destination": "payloads/kernel-capture/main.c",
+    "source_sha256": "9dfafe3abb7441524bf5001331f98daa3b413201e99bf992f24cb3dfee53e154"
+  },
+  {
+    "source": "research/fpkg-capture/paging.h",
+    "destination": "payloads/kernel-capture/paging.h",
+    "source_sha256": "27756eca017b273450d066a266e3aa3467ab2a79499fe218b8604d0e63527bac"
+  },
+  {
+    "source": "research/fpkg-capture/receive_dump.py",
+    "destination": "host/receive_capture.py",
+    "source_sha256": "eec5d27d8b7b90ad7c2a67db5f0003cc7c3dc2c2d343f7c07bd49fa11bc751a9"
+  },
+  {
+    "source": "research/fpkg-capture/test_paging.c",
+    "destination": "tests/test_capture_paging.c",
+    "source_sha256": "58ef230318222d894ae80dd50266af86ea9e579a5af15d3646f5887c55a0ccc1"
+  }
+]

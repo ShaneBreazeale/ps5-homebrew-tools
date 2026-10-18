@@ -4,14 +4,14 @@
   "note": "Files copied from the working tree, including untracked files. The checkpoint alone does not reproduce every import. Original and imported bytes are recorded per file.",
   "files": [
     {
-      "path": "payloads/procwatch/main.c",
+      "path": "payloads/process-watch/main.c",
       "source": "research/kstuff-lite/diagnostics/1360-20261017/procwatch.c",
       "source_sha256": "0d0d1d47ef3c50290e2a869546c7402eeb34c2119ab43bb2f695eac2187796d5",
       "changes": [],
       "import_sha256": "0d0d1d47ef3c50290e2a869546c7402eeb34c2119ab43bb2f695eac2187796d5"
     },
     {
-      "path": "payloads/shellshot/main.c",
+      "path": "payloads/process-snapshot/main.c",
       "source": "research/kstuff-lite/diagnostics/1360-20261017/shellshot.c",
       "source_sha256": "0bd0fb7bc7fa2229818d697dd8e1a04d48025fb5a4233509e517316143ef548e",
       "changes": [],
@@ -39,7 +39,7 @@
       "import_sha256": "17f48ecee1754c6954526a98593a74fa46a609cbf43bf3f51b8a2a181e5fbb6f"
     },
     {
-      "path": "payloads/reader3/main.c",
+      "path": "payloads/resident-snapshot/main.c",
       "source": "research/kstuff-lite/ps5-kstuff/debug-reader.c",
       "source_sha256": "be152899f8f807633bdea7c55f003bf129276203f1fd8dbd47f52fca9a36e7ff",
       "changes": [

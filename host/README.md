@@ -7,8 +7,8 @@ the standard library and support `--help`.
 
 ```sh
 mkdir -p captures
-python3 host/send_payload.py out/shellshot.elf \
-  --host "$PS5_HOST" --log captures/shellshot-001.log
+python3 host/send_payload.py out/process-snapshot.elf \
+  --host "$PS5_HOST" --log captures/process-snapshot-001.log
 ```
 
 Set `PS5_HOST` to your console address before using the example. The script
@@ -49,7 +49,7 @@ python3 host/summarize_threads.py captures/thread-probe-v2.log \
 ```
 
 The input must be a plain-text, completed v2 capture. Decompress a `.gz` capture
-before passing it to the script. V1 logs and reader3 logs are different formats.
+before passing it to the script. V1 logs and resident snapshot logs are different formats.
 
 The parser checks contiguous raw chunks, process/thread record sizes, ownership,
 TID consistency, the live layout-validation marker, completion, and the presence
@@ -70,3 +70,14 @@ JSON object keys for pass numbers and PIDs are strings. Candidate fields remain
 candidates; the summary is not a crash diagnosis. The current parser always
 includes the historical ShellCore-cap note in `limits`; inspect actual thread
 counts and raw `threads_end` records to assess your capture's truncation.
+
+## Other host tools
+
+- [Capture receiver](../docs/CAPTURE_TOOLS.md): receive and verify a kernel capture.
+- [Log tools](../docs/LOG_TOOLS.md): decode and compare resident captures.
+- [Analysis tools](../docs/ANALYSIS_TOOLS.md): audit offsets, patches, and binary dumps.
+- [Bundle packaging](../docs/BUILDING.md): create a source-and-artifact archive.
+
+The sender writes a `*.log.json` sidecar with payload/capture hashes, source
+revision, timestamps, transport outcome, and optional operator-supplied firmware,
+model, and resident profile. Keep this sidecar with the raw log.

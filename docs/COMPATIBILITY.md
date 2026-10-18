@@ -8,11 +8,14 @@ match historical binaries or support other consoles and firmware versions.
 
 | Component | Boundary |
 | --- | --- |
-| reader3 | A resident implementing `KEKCALL_SHARED_AREA_SNAPSHOT` with this exact snapshot layout |
-| procwatch / shellshot | Firmware-specific raw `kinfo_proc` offsets, including PID 72, name 447, and thread count 596 |
+| Resident snapshot | A resident implementing `KEKCALL_SHARED_AREA_SNAPSHOT` with this exact snapshot layout |
+| Process watch / process snapshot | Firmware-specific raw `kinfo_proc` offsets, including PID 72, name 447, and thread count 596 |
 | thread-probe-v1 | Raw selector probing; unsupported selectors can return ENOENT |
 | thread-probe-v2 | Explicitly requires firmware `(fw & 0xffff0000) == 0x13600000` and SoC `0x840fd0`; bounded kernel reads and a live self-check of list links, thread owner, and TID |
 | thread summarizer | A completed three-pass v2 capture with 1,096-byte process records and 0x480-byte thread records |
+| kernel capture | PS5 Pro 13.60 with the exact resume instrumentation and validated page map in its named profile |
+| capture exporter/receiver | Matching FPK1-END1 tools and a completed collector manifest; no console runtime test yet |
+| native app starter | Builds with the locally installed Payload SDK; console installation and runtime behavior remain untested |
 | minimal payload | New SDK starter; compiled locally, not console-tested |
 
 ## Reading the output
@@ -21,7 +24,7 @@ match historical binaries or support other consoles and firmware versions.
   value. A connection can close normally after a payload printed an error.
 - V2 can finish its sysctl capture with `kernel_layout_validated=0`; kernel
   thread reads are skipped and the v2 summarizer rejects that capture.
-- Procwatch polls every 50 ms. A process can start and exit between polls, so
+- Process watch polls every 50 ms. A process can start and exit between polls, so
   absence from its log does not prove no execution occurred. It matches entries
   by PID; very rapid PID reuse is another limitation.
 - The app-info layout used in these collectors differs from observed firmware
@@ -32,7 +35,7 @@ match historical binaries or support other consoles and firmware versions.
   owner/TID/list checks.
 - Kernel snapshots do not stop other threads. A record is an observation, not
   a stable crash dump or proof of the instruction blocking a thread.
-- Reader3 prints each snapshot's available ring window. Repeated words across
+- Resident snapshot prints each snapshot's available ring window. Repeated words across
   snapshots do not establish repeated events. A 16-word ring can overwrite
   earlier context, and a missing event needs a check that its logging path was
   armed.

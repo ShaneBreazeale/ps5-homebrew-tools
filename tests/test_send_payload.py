@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from contextlib import redirect_stderr, redirect_stdout
-import importlib.util
+import json
 import io
 from pathlib import Path
 import socket
@@ -8,10 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-SPEC = importlib.util.spec_from_file_location(
-    'send_payload', Path(__file__).resolve().parents[1] / 'host/send_payload.py')
-sender = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(sender)
+from host import send_payload as sender
 
 
 class SenderTests(unittest.TestCase):
@@ -42,6 +39,10 @@ class SenderTests(unittest.TestCase):
         connection.sendall.assert_called_once_with(self.data)
         connection.shutdown.assert_called_once_with(socket.SHUT_WR)
         self.assertEqual(self.log.read_bytes(), b'ready\nraw\xff\n')
+        metadata = json.loads(Path(str(self.log) + '.json').read_text())
+        self.assertEqual(metadata['transport']['outcome'], 'eof')
+        self.assertEqual(metadata['capture']['bytes'], 11)
+        self.assertEqual(metadata['payload_execution'], 'unknown')
 
     @patch.object(sender.socket, 'create_connection')
     def test_existing_capture_prevents_any_connection(self, connect):
@@ -70,6 +71,16 @@ class SenderTests(unittest.TestCase):
         connect.assert_called_once()
         connection.sendall.assert_called_once()
         self.assertEqual(self.log.read_bytes(), b'partial\n')
+        metadata = json.loads(Path(str(self.log) + '.json').read_text())
+        self.assertEqual(metadata['transport']['outcome'], 'idle_timeout')
+
+    @patch.object(sender.socket, 'create_connection')
+    def test_existing_manifest_prevents_connection(self, connect):
+        sidecar = Path(str(self.log) + '.json')
+        sidecar.write_text('preserved')
+        self.assertEqual(sender.main(self.args), 1)
+        connect.assert_not_called()
+        self.assertEqual(sidecar.read_text(), 'preserved')
 
     @patch.object(sender.socket, 'create_connection', side_effect=OSError('unreachable'))
     def test_connection_failure_does_not_retry(self, connect):

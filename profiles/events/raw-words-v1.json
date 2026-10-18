@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "id": "raw-words-v1",
+  "description": "Preserve ring words without assigning event semantics. Use for an unidentified resident, an unrecovered schema such as historical xlog, or process-only captures.",
+  "events": {},
+  "ambiguous_markers": {}
+}

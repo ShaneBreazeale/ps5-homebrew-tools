@@ -1,4 +1,6 @@
-# Reader3
+# resident-snapshot
+
+Public build name: `resident-snapshot`. Historical alias: `reader3`. Existing output prefixes are preserved.
 
 Read three snapshots from an already-loaded instrumented kstuff resident, with
 one second between snapshots. Each pass prints counters, available message and
@@ -17,9 +19,9 @@ meaning; pair the reader with the producing source/profile.
 From the repository root, with `PS5_PAYLOAD_SDK` and `PS5_HOST` set:
 
 ```sh
-make reader3
+make resident-snapshot
 mkdir -p captures
-python3 host/send_payload.py out/reader3.elf \
+python3 host/send_payload.py out/resident-snapshot.elf \
   --host "$PS5_HOST" --log captures/reader3-001.log
 ```
 

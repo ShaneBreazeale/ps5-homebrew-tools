@@ -9,7 +9,7 @@ are also provided under GPL-3.0-or-later. The complete GPL version 3 text is in
 
 ## kstuff reader and headers
 
-`payloads/reader3/main.c` and `vendor/kstuff/uelf/` were imported from the local
+`payloads/resident-snapshot/main.c` and `vendor/kstuff/uelf/` were imported from the local
 kstuff-lite research checkout, whose remote points to
 [EchoStretch/kstuff-lite](https://github.com/EchoStretch/kstuff-lite). Their
 original source locations, hashes, and import changes are in

@@ -1,4 +1,6 @@
-# Procwatch
+# process-watch
+
+Public build name: `process-watch`. Historical alias: `procwatch`. Existing output prefixes are preserved.
 
 Observe process births, disappearances, and transitions to the raw zombie state
 during a three-minute launch window. Procwatch queries sysctl every 50 ms and
@@ -9,9 +11,9 @@ keeps a bounded table of up to 256 processes.
 From the repository root, with `PS5_PAYLOAD_SDK` and `PS5_HOST` set:
 
 ```sh
-make procwatch
+make process-watch
 mkdir -p captures
-python3 host/send_payload.py out/procwatch.elf \
+python3 host/send_payload.py out/process-watch.elf \
   --host "$PS5_HOST" --idle-timeout 240 --log captures/procwatch-001.log
 ```
 

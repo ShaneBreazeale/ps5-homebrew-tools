@@ -11,7 +11,7 @@ include $(PS5_PAYLOAD_SDK)/toolchain/prospero.mk
 
 CFLAGS ?= -O2 -g
 CFLAGS += -Wall -Wextra
-TOOLS := reader3 procwatch shellshot thread-probe-v1 thread-probe-v2
+TOOLS := resident-snapshot process-watch process-snapshot thread-probe-v1 thread-probe-v2 kernel-capture capture-export
 
 .PHONY: all
 all: $(addprefix out/,$(addsuffix .elf,$(TOOLS))) out/minimal-payload.elf
@@ -19,11 +19,13 @@ all: $(addprefix out/,$(addsuffix .elf,$(TOOLS))) out/minimal-payload.elf
 out:
 	mkdir -p $@
 
-out/reader3.elf: payloads/reader3/main.c vendor/kstuff/uelf/shared_area.h vendor/kstuff/uelf/fself.h vendor/kstuff/uelf/syscall_fixes.h vendor/freebsd/sys/ioccom.h | out
+out/resident-snapshot.elf: payloads/resident-snapshot/main.c vendor/kstuff/uelf/shared_area.h vendor/kstuff/uelf/fself.h vendor/kstuff/uelf/syscall_fixes.h vendor/freebsd/sys/ioccom.h | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Ivendor -Ivendor/kstuff $(LDFLAGS) -o $@ $< $(LDLIBS)
 
-$(addprefix out/,$(addsuffix .elf,procwatch shellshot thread-probe-v1 thread-probe-v2)): out/%.elf: payloads/%/main.c | out
+$(addprefix out/,$(addsuffix .elf,process-watch process-snapshot thread-probe-v1 thread-probe-v2 kernel-capture capture-export)): out/%.elf: payloads/%/main.c | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
+
+out/kernel-capture.elf: payloads/kernel-capture/paging.h payloads/kernel-capture/profile_13_60_pro.h
 
 out/minimal-payload.elf: templates/minimal-payload/main.c | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)

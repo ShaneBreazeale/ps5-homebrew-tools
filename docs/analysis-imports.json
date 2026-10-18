@@ -1,0 +1,29 @@
+{
+  "note": "Reimplemented and generalized from local research scripts. Generic command names preserve source attribution here. Firmware assumptions moved into profiles/analysis; comparison carries over numeric table comparison only, not project-specific alias or reference logic. Shared input validation is new code in host/analysis_common.py. No console validation claimed.",
+  "files": [
+    {
+      "path": "host/validate_offsets.py",
+      "source": "research/fpkg-capture/validate_kstuff_offsets.py",
+      "source_sha256": "a18c5152ad2df6c518b723da802835b6fdac50e0129ce376b54764405ea2a670",
+      "import_sha256": "b72b896d98a2063752120eeecbaaea3c3dc17a7a06c416c0b60b2b63fb5ab863"
+    },
+    {
+      "path": "host/audit_patches.py",
+      "source": "research/fpkg-capture/audit_shellcore_patches.py",
+      "source_sha256": "48d74797968d1b2cbee05e9c2b091b5df956d2c2082b5df3906fef66b9b530bf",
+      "import_sha256": "235b897882dd7a890c13b77c05c8cc725fc21d15e10449ca8ffbde32fe5172dd"
+    },
+    {
+      "path": "host/wrap_dump.py",
+      "source": "research/fpkg-capture/wrap_kernel_elf.py",
+      "source_sha256": "306d1232ed6fb95f96a2592f42985a609fd4dd679e1c0d0cc223efa6eb072e1a",
+      "import_sha256": "8f62648366387fb54407f9a201e829be40bb39ee5f4a6e56f480fff8fed68ba0"
+    },
+    {
+      "path": "host/validate_offsets.py",
+      "source": "research/audit_offsets.py",
+      "source_sha256": "425818ba5601bf029e2b7cf23e5c99744879386049fb8cd9c2ef9eec3b3d6c29",
+      "import_sha256": "b72b896d98a2063752120eeecbaaea3c3dc17a7a06c416c0b60b2b63fb5ab863"
+    }
+  ]
+}

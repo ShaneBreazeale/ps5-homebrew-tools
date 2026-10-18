@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "scope-state-v1",
+  "historical_profile": "xslot",
+  "provenance": "residents/archive/patch-xslot.py.txt",
+  "description": "Partial schema recovered from the archived xslot patch for PS5 Pro 13.60. Match producing artifact/profile explicitly; this does not describe every inherited baseline event.",
+  "ring_capacity_words": 16,
+  "events": {
+    "PPREXV01": {
+      "name": "executable_path",
+      "fields": [
+        "path_word_0",
+        "path_word_1"
+      ],
+      "interpretation": "path_le"
+    },
+    "PPRUMX01": {
+      "name": "scoped_unmount",
+      "fields": [
+        "thread",
+        "pinned",
+        "scope_kind"
+      ]
+    },
+    "PPRSCP01": {
+      "name": "scope_state",
+      "fields": [
+        "occupied",
+        "packed_kinds",
+        "first_ppr_thread",
+        "state"
+      ]
+    }
+  },
+  "ambiguous_markers": {
+    "PPREKX01": "The same marker has two payload words on failure and three on success; no unambiguous discriminator is recorded."
+  }
+}

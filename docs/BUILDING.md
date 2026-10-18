@@ -28,6 +28,11 @@ export LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config  # macOS Homebrew
 make all
 ```
 
+The official LLVM 18 Linux release archives (`clang+llvm-18.1.x-...-ubuntu-18.04`)
+link against `libtinfo.so.5`, which Ubuntu 24.04 no longer ships. If `clang` fails
+with `libtinfo.so.5: cannot open shared object file`, put a copy of that library on
+`LD_LIBRARY_PATH`, or use the distribution's `clang-18`.
+
 The build uses the SDK's `prospero-clang` wrapper and does not download or
 globally install dependencies.
 
@@ -39,7 +44,7 @@ for the PS5's `znver2` CPU. What does matter:
 
 | Cause | Handling |
 | --- | --- |
-| LLVM release | The SDK's `crt1.o` and `libc.a` are built with Ubuntu clang 18.1.3. LLVM 20+ also makes the SDK skip `crt1.o` and use clang's built-in PS5 link path. The build requires LLVM 18; set `PS5_LLVM_VERSION=18.1.3` to require the exact release. |
+| LLVM release | The SDK's `crt1.o` and `libc.a` are built with Ubuntu clang 18.1.3. LLVM 20+ also makes the SDK skip `crt1.o` and use clang's built-in PS5 link path. The build requires LLVM 18. Ubuntu clang 18.1.3 and the official 18.1.8 release produced identical payloads ([validation](VALIDATION.md#reproducible-build-check-commit-be12627)). Set `PS5_LLVM_VERSION` to require one exact release. |
 | Checkout and SDK paths | `-g` stores source paths. `-ffile-prefix-map` rewrites them to `.` and `/ps5-payload-sdk`. |
 | Compiler vendor string | `-fno-ident` drops it from objects. The linker's `.comment` section is removed after linking. |
 | Exported `CFLAGS`, `CPPFLAGS`, `LDFLAGS`, `LDLIBS` | Ignored with a warning, since flags like `-march=native` would retarget the payload. Pass flags on the `make` command line instead. |

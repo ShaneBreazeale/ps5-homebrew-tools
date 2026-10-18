@@ -17,7 +17,7 @@ def git(*args):
     return subprocess.check_output(['git', *args], cwd=ROOT).decode().strip()
 
 
-def package(output, artifacts):
+def package(output, artifacts, toolchain=None):
     output = output.resolve()
     if output.exists():
         raise FileExistsError(f'output exists: {output}')
@@ -40,6 +40,7 @@ def package(output, artifacts):
         'source_commit': git('rev-parse', 'HEAD'),
         'source_dirty': bool(git('status', '--porcelain', '--untracked-files=normal')),
         'artifacts': sorted(str(path.relative_to(ROOT)) for path in selected),
+        'toolchain': toolchain,
         'sha256': hashes,
     }
     entries['manifest.json'] = (json.dumps(manifest, indent=2, sort_keys=True) + '\n').encode()
@@ -64,9 +65,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--artifact', type=Path, action='append', default=[])
+    parser.add_argument('--toolchain', help='compiler and SDK versions used for the artifacts')
     args = parser.parse_args()
     try:
-        package(args.output, args.artifact)
+        package(args.output, args.artifact, args.toolchain)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         parser.exit(1, f'package failed: {error}\n')
 

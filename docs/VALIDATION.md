@@ -4,6 +4,11 @@ Validated locally on 2026-10-18 using the existing PS5 Payload SDK installation
 and host LLVM 23.1.1. The external SDK installation was not fetched or upgraded
 as part of this import.
 
+> **Note (added later):** LLVM 23.1.1 is not the reference toolchain. The SDK's
+> libraries are built with LLVM 18, and LLVM 20+ uses a different SDK link path.
+> These ELFs therefore do not represent the intended output. Current builds require
+> LLVM 18; see [reproducible builds](BUILDING.md#reproducible-builds).
+
 - `make all`: all seven diagnostic ELF files and the minimal payload compiled.
 - The standalone minimal-payload directory also built with its own Makefile.
 - Each output was identified as an x86-64, little-endian ELF PIE executable.

@@ -10,6 +10,9 @@ the payload's return code. Keep partial output when a run fails.
 | `Set PS5_PAYLOAD_SDK ...` | Export the SDK root before building a payload; `make help` and `make check` work without it |
 | `must contain toolchain/prospero.mk` | Point to the extracted SDK root, not its parent or `target/` |
 | Compiler wrapper cannot find LLVM tools | Configure `LLVM_CONFIG` according to the public SDK's instructions; see [Building](BUILDING.md) |
+| `LLVM ... found; payloads require LLVM 18` | The SDK picked up a newer LLVM. Set `LLVM_CONFIG` to an LLVM 18 `llvm-config`, or use `make container-build` |
+| Same source builds different bytes on another machine | Compare `make checksums` with the CI `payloads` artifact; see [reproducible builds](BUILDING.md#reproducible-builds) |
+| `Ignoring CFLAGS from the environment` | Your shell exports build flags; pass intended flags on the `make` command line |
 | `make` only prints help | This is the default target; use `make all` or a tool name |
 | Changes appear to have no effect | Confirm the target/source path; after changing SDK or compiler settings, use `make clean` and rebuild |
 | Reader emits an unused `reopen_log_file` warning | This is inherited source; its main loop never calls that helper |

@@ -3,8 +3,11 @@
 ## Prerequisites
 
 Use the public [PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk), Make,
-Python 3.9+, and the host LLVM tools required by that SDK. The SDK documents
+Python 3.9+, and **LLVM 18** (clang, lld, and llvm tools). The SDK documents
 prebuilt archives and host prerequisites. No proprietary SDK is needed.
+
+The quickest path to correct output is the [reference container](#reproducible-builds),
+which needs only Docker.
 
 Set the SDK path to a directory containing `toolchain/prospero.mk`, `bin/`, and
 `target/`:
@@ -14,18 +17,45 @@ export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk
 make all
 ```
 
-On macOS, set `LLVM_CONFIG` to the executable for your chosen LLVM installation,
-as described by the SDK. For example, if LLVM 18 is already installed there:
+The SDK uses the first LLVM it finds (`$LLVM_CONFIG`, then `llvm-config-23` down
+to `llvm-config-15`), so a machine with a newer LLVM installed silently builds with
+it. The build stops unless that LLVM is major version 18. Point `LLVM_CONFIG` at
+LLVM 18:
 
 ```sh
-export LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config
+export LLVM_CONFIG=/usr/bin/llvm-config-18                    # Ubuntu/Debian
+export LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config  # macOS Homebrew
 make all
 ```
 
 The build uses the SDK's `prospero-clang` wrapper and does not download or
-globally install dependencies. No local workspace paths are compiled into the
-build configuration. The SDK is supplied externally; a portable, checksum-pinned
-SDK bootstrap is not included in this initial import.
+globally install dependencies.
+
+## Reproducible builds
+
+Same source, same SDK, and the same LLVM release give byte-identical ELFs on any
+host. Your CPU does not matter: the `x86_64-sie-ps5` target always generates code
+for the PS5's `znver2` CPU. What does matter:
+
+| Cause | Handling |
+| --- | --- |
+| LLVM release | The SDK's `crt1.o` and `libc.a` are built with Ubuntu clang 18.1.3. LLVM 20+ also makes the SDK skip `crt1.o` and use clang's built-in PS5 link path. The build requires LLVM 18; set `PS5_LLVM_VERSION=18.1.3` to require the exact release. |
+| Checkout and SDK paths | `-g` stores source paths. `-ffile-prefix-map` rewrites them to `.` and `/ps5-payload-sdk`. |
+| Compiler vendor string | `-fno-ident` drops it from objects. The linker's `.comment` section is removed after linking. |
+| Exported `CFLAGS`, `CPPFLAGS`, `LDFLAGS`, `LDLIBS` | Ignored with a warning, since flags like `-march=native` would retarget the payload. Pass flags on the `make` command line instead. |
+
+For the reference build, use the container: Ubuntu 24.04, clang 18.1.3, and SDK
+v0.44 pinned by SHA-256 ([Dockerfile](../tooling/container/Dockerfile)). It runs as
+`linux/amd64`, including on Apple silicon (emulated, slower):
+
+```sh
+make container-build   # builds every payload and writes out/SHA256SUMS
+```
+
+CI runs the same build and uploads the ELFs and `SHA256SUMS` as the `payloads`
+artifact. To check a local build, run `make checksums` and compare the result with
+that artifact. Builds made before these rules, for example with Homebrew LLVM
+23.1.1, are not expected to match.
 
 ## Targets
 
@@ -37,7 +67,9 @@ SDK bootstrap is not included in this initial import.
 | `make process-snapshot` | Compile the one-shot process snapshot tool |
 | `make thread-probe-v1 thread-probe-v2` | Compile the raw collectors |
 | `make kernel-capture capture-export` | Build the collector and exporter |
-| `make bundle` | Build payloads and package source, binaries, and SHA-256 inventory |
+| `make bundle` | Build payloads and package source, binaries, SHA-256 inventory, and toolchain versions |
+| `make container-build` | Build all payloads in the pinned reference container |
+| `make checksums` | Write and print `out/SHA256SUMS` for built payloads |
 | `make native-app` | Build the native app folder and ZIP; see [native app](NATIVE_APP.md) |
 | `make native-check` | Rebuild the native host tools and runtime and verify pinned checksums, without an SDK |
 | `make minimal-payload` | Compile the starter payload |

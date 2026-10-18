@@ -73,6 +73,13 @@ def build(args):
         raise ValueError('contentId must match titleId and contain a 16-character suffix')
     if not (sdk / 'target/lib').is_dir():
         raise ValueError('SDK must contain target/lib')
+    # Same rule as mk/payloads.mk: the SDK libraries are built with LLVM 18,
+    # and LLVM 20+ switches the SDK to a different startup/link path.
+    llvm = subprocess.run([str(sdk / 'bin/prospero-llvm-config'), '--version'],
+                          capture_output=True, text=True).stdout.strip()
+    major = os.environ.get('PS5_LLVM_MAJOR', '18')
+    if major and llvm.split('.')[0] != major:
+        raise ValueError(f'LLVM {llvm or "not found"}; the native app requires LLVM {major} (set LLVM_CONFIG)')
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     destination = output / title
@@ -85,7 +92,7 @@ def build(args):
         objects = []
         for unit in [NATIVE / 'app_crt.cpp', NATIVE / 'app_cpp_runtime.cpp', source / 'main.cpp']:
             obj = work / (unit.stem + '.o')
-            run(sdk / 'bin/prospero-clang++', '-std=c++20', '-O2', '-Wall', '-Wextra', '-fno-exceptions', '-fno-rtti', '-ffunction-sections', '-fdata-sections', '-c', unit, '-o', obj)
+            run(sdk / 'bin/prospero-clang++', '-std=c++20', '-O2', '-Wall', '-Wextra', '-fno-exceptions', '-fno-rtti', '-ffunction-sections', '-fdata-sections', '-fno-ident', f'-ffile-prefix-map={ROOT}=.', f'-ffile-prefix-map={source}=template', '-c', unit, '-o', obj)
             objects.append(obj)
         stubs = sorted((sdk / 'target/lib').glob('*.so'))
         intermediate, elf = work / 'llvm-pie.elf', work / 'eboot.elf'
@@ -101,7 +108,7 @@ def build(args):
         for file in [app / 'eboot.bin', app / 'sce_module/libc.prx']:
             run(tool, 'self', '--inspect', '--file', file)
         files = {str(p.relative_to(app)): sha(p) for p in sorted(app.rglob('*')) if p.is_file()}
-        (app / 'build-manifest.json').write_text(json.dumps({'schema': 1, 'console_tested': False, 'files': files, 'source_sha256': {str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else p.name: sha(p) for p in [source / 'main.cpp', source / 'sce_sys/param.json', *NATIVE.glob('*.cpp'), *NATIVE.glob('*.hpp'), *NATIVE.glob('*.ld'), *NATIVE.glob('*.map'), *sorted((NATIVE / 'runtime').glob('*.txt'))]}}, indent=2) + '\n')
+        (app / 'build-manifest.json').write_text(json.dumps({'schema': 1, 'console_tested': False, 'llvm': llvm, 'files': files, 'source_sha256': {str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else p.name: sha(p) for p in [source / 'main.cpp', source / 'sce_sys/param.json', *NATIVE.glob('*.cpp'), *NATIVE.glob('*.hpp'), *NATIVE.glob('*.ld'), *NATIVE.glob('*.map'), *sorted((NATIVE / 'runtime').glob('*.txt'))]}}, indent=2) + '\n')
         temporary_zip = work / (title + '.zip')
         with zipfile.ZipFile(temporary_zip, 'w', zipfile.ZIP_DEFLATED) as bundle:
             for file in sorted(app.rglob('*')):

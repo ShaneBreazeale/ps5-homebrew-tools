@@ -35,10 +35,12 @@ resident builds are not included in the tool targets.
 
 ## Installation
 
-You need Python 3.9+, Make, and the public
-[PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk) with its host LLVM
-prerequisites. Python utilities use the standard library. Follow the
-[build guide](docs/BUILDING.md) for SDK and LLVM configuration.
+You need Python 3.9+, Make, the public
+[PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk), and LLVM 18. Newer LLVM
+releases produce different payload bytes, so the build refuses them. Python
+utilities use the standard library. Follow the [build guide](docs/BUILDING.md) for
+SDK and LLVM configuration, or run `make container-build` with Docker for the
+pinned [reproducible build](docs/BUILDING.md#reproducible-builds).
 
 From a checkout or extracted source directory:
 

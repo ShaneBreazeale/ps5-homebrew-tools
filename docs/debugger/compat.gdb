@@ -12,3 +12,4 @@ set remote memory-read-packet-size 256
 set remote memory-write-packet-size 256
 set remote hardware-breakpoint-limit 4
 set remote hardware-watchpoint-limit 0
+# `break` uses Z0 (INT3). `hbreak` uses Z1 and needs a free DR slot.

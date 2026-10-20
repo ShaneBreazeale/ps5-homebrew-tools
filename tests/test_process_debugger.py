@@ -16,10 +16,13 @@ MOCK = r'''
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 static struct reg mock_regs[2];
 static struct dbreg mock_db[2];
 static unsigned char mock_memory[1024];
 static int pending, attached, fail_set, corrupt_set, sets, stepped[2], suspended[2];
+static int writes, fail_write, short_write, corrupt_write, partial_error;
+static int event_lwp, event_code, continues, step_signal, step_code, step_stop_lwp, step_exit, step_no_siginfo;
 static int mock_ptrace(int request, int id, caddr_t address, int data) {
     int i = id == 102 ? 1 : 0;
     switch(request) {
@@ -36,24 +39,55 @@ static int mock_ptrace(int request, int id, caddr_t address, int data) {
         mock_db[i] = *(struct dbreg*)address;
         if(sets == corrupt_set) mock_db[i].dr[7] &= ~(15ul << 24);
         return 0;
-    case PT_LWPINFO: ((struct ptrace_lwpinfo*)address)->pl_lwpid = 101; return 0;
+    case PT_LWPINFO: {
+        struct ptrace_lwpinfo *info = (void*)address;
+        info->pl_lwpid = event_lwp;
+        info->pl_flags = step_no_siginfo && continues > 1 ? 0 : PL_FLAG_SI;
+        info->pl_siginfo.si_code = event_code;
+        return 0;
+    }
     case PT_GETREGS: *(struct reg*)address = mock_regs[i]; return 0;
     case PT_SETREGS: mock_regs[i] = *(struct reg*)address; return 0;
     case PT_CLEARSTEP: stepped[i] = 0; return 0;
     case PT_SETSTEP: stepped[i] = 1; return 0;
     case PT_SUSPEND: suspended[i] = 1; return 0;
     case PT_RESUME: suspended[i] = 0; return 0;
-    case PT_CONTINUE:
-        mock_regs[0].r_rip++;
-        mock_db[0].dr[6] = 0;
-        for(int k = 0; k < 4; k++) if(target.bp[k].used) mock_db[0].dr[6] |= 1ul << k;
-        pending = SIGTRAP; return 0;
+    case PT_CONTINUE: {
+        continues++;
+        int active = stepped[1] ? 1 : 0;
+        unsigned long rip = mock_regs[active].r_rip;
+        mock_db[active].dr[6] = 0;
+        event_lwp = active ? 102 : 101;
+        event_code = stepped[active] ? TRAP_TRACE : 0;
+        if(stepped[active] && step_exit) { pending = -1; return 0; }
+        if(rip < sizeof(mock_memory) && mock_memory[rip] == 0xcc) {
+            mock_regs[active].r_rip = rip + 1;
+            event_code = TRAP_BRKPT;
+            pending = SIGTRAP; return 0;
+        }
+        mock_regs[active].r_rip++;
+        for(int k = 0; k < 4; k++) if(target.bp[k].used) mock_db[active].dr[6] |= 1ul << k;
+        pending = SIGTRAP;
+        if(stepped[active]) {
+            if(step_signal) pending = step_signal;
+            if(step_code) event_code = step_code;
+            if(step_stop_lwp) event_lwp = step_stop_lwp;
+        }
+        return 0;
+    }
     case PT_IO: {
         struct ptrace_io_desc* io = (void*)address;
         uintptr_t offset = (uintptr_t)io->piod_offs;
         if(offset > sizeof(mock_memory) || io->piod_len > sizeof(mock_memory)-offset) { errno = EFAULT; return -1; }
         if(io->piod_op == PIOD_READ_D) __builtin_memcpy(io->piod_addr, mock_memory+offset, io->piod_len);
-        else __builtin_memcpy(mock_memory+offset, io->piod_addr, io->piod_len);
+        else {
+            writes++;
+            if(writes == fail_write) { errno = EFAULT; return -1; }
+            if(writes == short_write || writes == partial_error) io->piod_len = 1;
+            __builtin_memcpy(mock_memory+offset, io->piod_addr, io->piod_len);
+            if(writes == corrupt_write) mock_memory[offset] ^= 1;
+            if(writes == partial_error) { errno = EFAULT; return -1; }
+        }
         return 0;
     }
     default: errno = EINVAL; return -1;
@@ -61,7 +95,7 @@ static int mock_ptrace(int request, int id, caddr_t address, int data) {
 }
 static pid_t mock_wait4(pid_t pid, int* status, int flags, struct rusage* usage) {
     if(!pending) return 0;
-    *status = (pending << 8) | 0x7f;
+    *status = pending == -1 ? 3 << 8 : (pending << 8) | 0x7f;
     pending = 0;
     return pid;
 }
@@ -69,17 +103,126 @@ static void setup(void) {
     __builtin_memset(&target, 0, sizeof(target));
     __builtin_memset(mock_regs, 0, sizeof(mock_regs));
     __builtin_memset(mock_db, 0, sizeof(mock_db));
+    __builtin_memset(mock_memory, 0, sizeof(mock_memory));
     mock_regs[0].r_rip = mock_regs[1].r_rip = 0x1000;
     mock_regs[0].r_rflags = mock_regs[1].r_rflags = 0x202;
     /* Slot 1 is owned by someone else and must survive all operations. */
     mock_db[0].dr[1] = mock_db[1].dr[1] = 0x9000;
     mock_db[0].dr[7] = mock_db[1].dr[7] = 0x4;
     sets = fail_set = corrupt_set = pending = attached = 0;
+    writes = fail_write = short_write = corrupt_write = partial_error = continues = 0;
+    step_signal = step_code = step_stop_lwp = step_exit = step_no_siginfo = 0;
+    event_lwp = 101; event_code = 0;
+    __builtin_memset(stepped, 0, sizeof(stepped));
+    __builtin_memset(suspended, 0, sizeof(suspended));
+}
+static void software_write_tests(void) {
+    for(int mode=0; mode<6; mode++) {
+        setup();
+        assert(attach_process(4242) == 0);
+        mock_memory[0x1f] = 0x11; mock_memory[0x20] = 0x90;
+        assert(breakpoint(1, 0, 0x20, 1) == 0);
+        unsigned char data[1024]; __builtin_memset(data, 0x41, sizeof(data));
+        if(mode == 0) {
+            /* Original rejected M20,400 reproducer: pre-read faults too. */
+            assert(memory_io(PIOD_WRITE_D, 0x20, data, sizeof(data)) == -EFAULT);
+        } else {
+            if(mode == 1) fail_write = writes+1;
+            if(mode == 2 || mode == 4) short_write = writes+1;
+            if(mode == 3) corrupt_write = writes+1;
+            if(mode == 5) partial_error = writes+1;
+            if(mode == 4) fail_write = writes+2; /* rollback cannot restore */
+            assert(memory_io(PIOD_WRITE_D, 0x1f, data, 3) < 0);
+        }
+        assert(target.sw[0].original == 0x90);
+        assert(mock_memory[0x20] == 0xcc);
+        assert(target.poisoned == (mode == 4));
+        if(mode == 4) {
+            assert(resume_process(0, 0, 0) == -EIO);
+            assert(breakpoint(0, 0, 0x20, 1) == -EIO);
+            assert(memory_io(PIOD_WRITE_D, 0x20, data, 1) == -EIO);
+            assert(detach_process() == -EIO && attached && target.stopped);
+            continue; /* Detach must not resume an unrestored byte range. */
+        } else {
+            assert(mock_memory[0x1f] == 0x11 && mock_memory[0x21] == 0);
+            assert(breakpoint(0, 0, 0x20, 1) == 0);
+            assert(mock_memory[0x20] == 0x90);
+        }
+        assert(detach_process() == 0);
+    }
+    setup(); assert(attach_process(4242) == 0);
+    mock_memory[0x20] = 0x90; mock_memory[0x22] = 0x91;
+    assert(breakpoint(1, 0, 0x20, 1) == 0);
+    assert(breakpoint(1, 0, 0x22, 1) == 0);
+    unsigned char data[3] = {0x41, 0x42, 0x43};
+    assert(memory_io(PIOD_WRITE_D, 0x20, data, 3) == 0);
+    assert(mock_memory[0x20] == 0xcc && mock_memory[0x21] == 0x42 && mock_memory[0x22] == 0xcc);
+    unsigned char readback[3];
+    assert(memory_io(PIOD_READ_D, 0x20, readback, 3) == 0);
+    assert(!__builtin_memcmp(data, readback, 3));
+    assert(detach_process() == 0);
+    assert(!__builtin_memcmp(mock_memory+0x20, data, 3));
+    puts("software breakpoint write transaction assertions passed");
+}
+static void software_step_tests(void) {
+    for(int mode=0; mode<10; mode++) {
+        setup(); assert(attach_process(4242) == 0);
+        mock_memory[0x20] = 0x90;
+        assert(breakpoint(1, 0, 0x20, 1) == 0);
+        mock_regs[0].r_rip = 0x20;
+        assert(resume_process(0, 0, 0) == 0 && target.sw_hit == 0);
+        int before = continues;
+        /* Both Hc and Hg may select a different LWP after the hit. The hidden
+         * step must execute the LWP whose RIP was rewound. */
+        target.resume_thread = target.selected = 102;
+        if(mode == 1) step_signal = SIGSEGV;
+        if(mode == 2) step_code = TRAP_BRKPT;
+        if(mode == 3) step_stop_lwp = 102;
+        if(mode == 4) step_exit = 1;
+        if(mode == 5) step_signal = SIGSTOP;
+        if(mode == 6) mock_regs[0].r_rip = 0x30; /* client changed RIP */
+        if(mode == 8) step_no_siginfo = 1;
+        if(mode == 9) assert(breakpoint(1, 1, 0x99, 1) == 0);
+        int result = resume_process(mode == 7, mode == 7 ? 102 : 0, 0);
+        if(mode == 4) {
+            assert(result == 1 && !target.pid && !target.poisoned);
+            assert(continues == before+1);
+            continue;
+        }
+        assert(result == 0 && target.stopped && !target.poisoned);
+        assert(mock_memory[0x20] == 0xcc && !stepped[0] && !stepped[1]);
+        assert(!suspended[0] && !suspended[1]);
+        assert(continues == before + (mode == 0 ? 2 : 1));
+        if(mode == 1 || mode == 5) assert(WSTOPSIG(target.status) == step_signal);
+        if(mode == 2 || mode == 8 || mode == 9) assert(!target.step_complete);
+        if(mode == 3) assert(target.stopped_thread == 102 && !target.step_complete);
+        if(mode == 7) {
+            assert(mock_regs[0].r_rip == 0x20);
+            assert(mock_regs[1].r_rip == 0x1001);
+        } else assert(mock_regs[1].r_rip == 0x1000);
+        assert(detach_process() == 0);
+    }
+    puts("software breakpoint step-over stop preservation assertions passed");
 }
 static void unit_tests(void) {
     setup();
     assert(attach_process(4242) == 0);
     assert(target.count == 2 && target.selected == 101);
+    mock_memory[0x20] = 0x90;
+    assert(breakpoint(1, 0, 0x20, 1) == 0);
+    assert(mock_memory[0x20] == 0xcc);
+    assert(target.sw[0].used && target.sw[0].original == 0x90);
+    unsigned char shadowed = 0xff;
+    assert(memory_io(PIOD_READ_D, 0x20, &shadowed, 1) == 0 && shadowed == 0x90);
+    assert(breakpoint(1, 0, 0x20, 1) == 0);
+    assert(breakpoint(0, 0, 0x20, 1) == 0);
+    assert(mock_memory[0x20] == 0x90);
+    for(int i = 0; i < 64; i++) assert(breakpoint(1, 0, 0x30 + i, 1) == 0);
+    assert(breakpoint(1, 0, 0x80, 1) == -ENOSPC);
+    assert(breakpoint(0, 0, 0x30, 1) == 0);
+    assert(breakpoint(1, 0, 0x80, 1) == 0);
+    for(int i = 1; i < 64; i++) assert(breakpoint(0, 0, 0x30 + i, 1) == 0);
+    assert(breakpoint(0, 0, 0x80, 1) == 0);
     assert(breakpoint(1, 1, 0x1000, 1) == 0);
     assert(target.bp[0].used && !target.bp[1].used);
     assert(mock_db[0].dr[0] == 0x1000 && mock_db[1].dr[0] == 0x1000);
@@ -125,11 +268,18 @@ static void unit_tests(void) {
     assert(sets == previous_sets);
     assert(__builtin_memcmp(&before0, &mock_db[0], sizeof(before0)) == 0);
     assert(__builtin_memcmp(&before1, &mock_db[1], sizeof(before1)) == 0);
+    mock_memory[0x21] = 0x90;
+    assert(breakpoint(1, 0, 0x21, 1) == 0);
+    assert(mock_memory[0x21] == 0xcc);
+    assert(sets == previous_sets);
+    assert(breakpoint(0, 0, 0x21, 1) == 0);
     assert(detach_process() == 0);
     puts("backend state/readback/ownership/rollback assertions passed");
 }
 int main(int argc, char** argv) {
     if(argc == 1) { unit_tests(); return 0; }
+    if(!strcmp(argv[1], "write-tests")) { software_write_tests(); return 0; }
+    if(!strcmp(argv[1], "step-tests")) { software_step_tests(); return 0; }
     setup();
     gdb_socket = atoi(argv[1]);
     serve();
@@ -218,6 +368,12 @@ static pid_t mock_wait4(pid_t, int*, int, struct rusage*);''')
     def attach(self):
         self.assertTrue(self.request("vAttach;1092").startswith(b"T"))
 
+    def test_software_write_failure_transactions(self):
+        subprocess.run([self.exe, "write-tests"], check=True)
+
+    def test_software_step_over_preserves_unexpected_stops(self):
+        subprocess.run([self.exe, "step-tests"], check=True)
+
     def test_retired_pcb_flag_is_rejected(self):
         result = subprocess.run(["cc", "-D_GNU_SOURCE", "-DPROCESS_DEBUGGER_KERNEL_DBREGS",
             "-fsyntax-only", "-w", "-I", str(PAYLOAD), "-I", str(ROOT / "vendor/prosper0gdb"),
@@ -280,9 +436,27 @@ static pid_t mock_wait4(pid_t, int*, int, struct rusage*);''')
         self.assertTrue(self.request("vAttach;1092").startswith(b"E"))
 
     def test_xml_chunking(self):
-        self.assertIn(b"hwbreak+", self.request("qSupported:swbreak+"))
+        supported = self.request("qSupported:swbreak+")
+        self.assertIn(b"hwbreak+", supported)
+        self.assertIn(b"swbreak+", supported)
         self.assertTrue(self.request("qXfer:features:read:target.xml:0,10").startswith(b"m"))
         self.assertTrue(self.request("qXfer:features:read:target.xml:ffffffff,10").startswith(b"E"))
+
+    def test_software_breakpoint_stop_and_shadow(self):
+        self.attach()
+        self.assertEqual(self.request("M20,1:90"), b"OK")
+        self.assertEqual(self.request("Z0,20,1"), b"OK")
+        self.assertEqual(self.request("m20,1"), b"90")
+        self.assertEqual(self.request("Z0,20,1"), b"OK")
+        self.assertEqual(self.request("P10=2000000000000000"), b"OK")
+        self.assertIn(b"swbreak:;", self.request("c"))
+        self.assertEqual(self.request("p10"), b"2000000000000000")
+        stop = self.request("c")
+        self.assertTrue(stop.startswith(b"T05"))
+        self.assertNotIn(b"swbreak:;", stop)
+        self.assertEqual(self.request("p10"), b"2200000000000000")
+        self.assertEqual(self.request("z0,20,1"), b"OK")
+        self.assertEqual(self.request("m20,1"), b"90")
 
 
 if __name__ == "__main__":

@@ -41,17 +41,22 @@ validated debugger. The full console validator has never passed.
   permitted mutations/resumes and stop conditions before using a live target.
 - One RSP client at a time. Do not run the validator or a second probe beside GDB.
   Never probe the ELF loader with an empty connection or resend on idle timeout.
+  Classify a black or frozen session with `host/session_health.py` (ICMP only)
+  or the `session_health` sidecar from a failed send. Do not send another ELF
+  into `elfldr_dead`, `kernel_unreachable`, or `loader_silent`.
 - Start with the compatibility profile in `docs/debugger/compat.gdb`. It disables
   multi-action vCont and automatic reconnect. Current stock-GDB integration is
   not console-validated; use the protocol log to diagnose incompatibility.
 - Prefer small GP-register/memory inspections and bounded instruction steps.
-  `continue` resumes the process, not just a selected thread. `next`, `finish`,
-  `run`, target function calls, software breakpoints and signal-delivery resume
-  are not established workflows for this stub.
-- All four DR slots may belong to kstuff. An ENOSPC result means stop and report
-  unavailable capacity. Never clear another owner's slots or use the disposable
-  child's slot lease on a real application. Data watchpoints remain disabled
-  on retail 13.60; a readback match does not prove a watchpoint fires.
+  `continue` resumes the process, not just a selected thread. `break` / `Z0`
+  software breakpoints are implemented (`INT3`, no DR slots) and host-tested.
+  They are not console-tested. `next`, `finish`, `run`, target function calls
+  and signal-delivery resume remain unvalidated workflows.
+- All four DR slots may belong to kstuff. Use `Z0` software breakpoints in that
+  case. An ENOSPC result on `Z1` means stop and report unavailable hardware
+  capacity. Never clear another owner's slots or use the disposable child's
+  slot lease on a real application. Data watchpoints remain disabled on retail
+  13.60; a readback match does not prove a watchpoint fires.
 - Detach explicitly, record the reply, preserve logs and report any unknown
   cleanup state. Do not kill/reboot a target or server as an automatic recovery.
   Debugger disconnect can leave state uncertain; cleanup is not fully validated.

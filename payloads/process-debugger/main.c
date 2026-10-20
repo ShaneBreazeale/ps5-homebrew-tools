@@ -21,8 +21,13 @@
 #endif
 
 #define MAX_THREADS 256
+#define MAX_SWBREAK 64
 #define MAX_PACKET 4096
+#define MAX_MEMORY 1024
 #define CORE_REG_BYTES 164
+#define INT3 0xcc
+#define DETACH_RETRIES 8
+#define CREDENTIAL_RETRIES 8
 #ifndef PROCESS_DEBUG_PORT
 #define PROCESS_DEBUG_PORT 1234
 #endif
@@ -32,13 +37,20 @@ struct thread_state {
     struct dbreg original, baseline;
     int suspended, stepped;
 };
+struct swbreak {
+    unsigned long long address;
+    unsigned char original;
+    int used;
+};
 static struct {
     pid_t pid;
     lwpid_t selected, resume_thread, stopped_thread;
     struct thread_state threads[MAX_THREADS];
-    int count, stopped, status, poisoned, last_step;
+    int count, stopped, status, poisoned, memory_poisoned, last_step, step_complete;
+    lwpid_t step_thread;
     struct hwbreak bp[4];
-    int hit;
+    struct swbreak sw[MAX_SWBREAK];
+    int hit, sw_hit;
 } target;
 static pid_t test_pid;
 static int shutting_down;
@@ -255,6 +267,7 @@ static int wait_stop(int interruptible)
         if(r < 0) { if(errno == EINTR) continue; return -errno; }
         if(r == target.pid) {
             target.status = status;
+            target.step_complete = 0;
             if(WIFEXITED(status) || WIFSIGNALED(status)) {
                 if(target.pid == test_pid) test_pid = 0;
                 target.pid = 0; target.count = 0; target.stopped = 0;
@@ -269,6 +282,7 @@ static int wait_stop(int interruptible)
             if((e = restore_thread_control()) < 0) return e;
             if((e = refresh_threads()) < 0) return e;
             target.hit = -1;
+            target.sw_hit = -1;
             if(WSTOPSIG(status) == SIGTRAP) {
                 struct dbreg db;
                 if((e = call(PT_GETDBREGS, target.stopped_thread, &db, 0)) < 0) return e;
@@ -277,14 +291,32 @@ static int wait_stop(int interruptible)
                 printf("process-debugger: trap tid=%d code=%d rip=%llx dr6=%lx dr7=%lx\n",
                        target.stopped_thread, info.pl_siginfo.si_code,
                        (unsigned long long)event_regs.r_rip, db.dr[6], db.dr[7]);
-                for(int k = 0; k < 4; k++) if((db.dr[6] & (1ul << k)) && target.bp[k].used) {
-                    target.hit = k; break;
+                if(!target.last_step && event_regs.r_rip) {
+                    unsigned long long at = (unsigned long long)event_regs.r_rip - 1;
+                    for(int i = 0; i < MAX_SWBREAK; i++) if(target.sw[i].used &&
+                        target.sw[i].address == at) {
+                        unsigned char insn = 0;
+                        struct ptrace_io_desc io = {PIOD_READ_D, (void*)at, &insn, 1};
+                        if((e = call(PT_IO, target.pid, &io, 0)) < 0) return e;
+                        if(io.piod_len == 1 && insn == INT3) {
+                            event_regs.r_rip = at;
+                            if((e = call(PT_SETREGS, target.stopped_thread, &event_regs, 0)) < 0)
+                                return e;
+                            target.sw_hit = i;
+                        }
+                        break;
+                    }
                 }
+                if(target.sw_hit < 0) for(int k = 0; k < 4; k++)
+                    if((db.dr[6] & (1ul << k)) && target.bp[k].used) {
+                        target.hit = k; break;
+                    }
             }
             /* PS5 retail PT_GETDBREGS exposes stale DR6 (observed BS set
              * after both stepping and hardware traps). Classify only events
              * that are unambiguous without those status bits. */
-            if(target.hit < 0 && WSTOPSIG(status) == SIGTRAP && !target.last_step &&
+            if(target.sw_hit < 0 && target.hit < 0 && WSTOPSIG(status) == SIGTRAP &&
+               !target.last_step &&
                (info.pl_flags & PL_FLAG_SI) && info.pl_siginfo.si_code == TRAP_TRACE) {
                 struct reg regs;
                 if((e = call(PT_GETREGS, target.stopped_thread, &regs, 0)) < 0) return e;
@@ -298,6 +330,13 @@ static int wait_stop(int interruptible)
                 if(target.hit < 0 && data_count == 1 && index >= 0 &&
                    !(target.threads[index].baseline.dr[7] & 255)) target.hit = data_slot;
             }
+            /* Internal breakpoint step-over may hide only the matching trace
+             * completion. Application signals, breakpoint traps and another
+             * LWP's stop must be returned to the client without another resume. */
+            target.step_complete = target.last_step &&
+                target.stopped_thread == target.step_thread &&
+                WSTOPSIG(status) == SIGTRAP && (info.pl_flags & PL_FLAG_SI) &&
+                info.pl_siginfo.si_code == TRAP_TRACE && target.hit < 0 && target.sw_hit < 0;
             return apply_breakpoints();
         }
         if(interruptible && !interrupted) {
@@ -335,13 +374,16 @@ static int attach_process(unsigned long long pid)
 #endif
     if(!attached) return r < 0 ? r : -EPERM;
     __builtin_memset(&target, 0, sizeof(target));
-    target.pid = pid; target.hit = -1;
+    target.pid = pid; target.hit = -1; target.sw_hit = -1;
     if(r < 0) return r; /* Preserve ownership for cleanup after restoration errors. */
     return wait_stop(0);
 }
 static int detach_process(void)
 {
     if(!target.pid) return 0;
+    /* Detach resumes execution. A failed memory rollback cannot be repaired by
+     * restoring breakpoint bytes/debug registers, so preserve the stopped target. */
+    if(target.memory_poisoned) return -EIO;
     int r;
     if(!target.stopped) {
         if(signal_process(target.pid, SIGSTOP) < 0) return -errno;
@@ -349,6 +391,13 @@ static int detach_process(void)
         if(r != 0) return r < 0 ? r : 0;
     }
     if((r = restore_thread_control()) < 0) return r;
+    for(int i = 0; i < MAX_SWBREAK; i++) if(target.sw[i].used) {
+        unsigned char orig = target.sw[i].original;
+        struct ptrace_io_desc io = {PIOD_WRITE_D, (void*)target.sw[i].address, &orig, 1};
+        r = call(PT_IO, target.pid, &io, 0);
+        if(r < 0 || io.piod_len != 1) return r < 0 ? r : -EFAULT;
+        target.sw[i].used = 0;
+    }
     for(int i = 0; i < target.count; i++)
         if((r = write_dbregs_checked(target.threads[i].id, &target.threads[i].original)) < 0) return r;
     if((r = call(PT_DETACH, target.pid, (void*)1, 0)) < 0) return r;
@@ -374,7 +423,10 @@ static int stopped_reply(void)
     const char* t = "thread:";
     while(*t) *p++ = *t++;
     p = puthex(p, target.stopped_thread); *p++ = ';';
-    if(target.hit >= 0) {
+    if(target.sw_hit >= 0 && target.sw[target.sw_hit].used) {
+        t = "swbreak:;";
+        while(*t) *p++ = *t++;
+    } else if(target.hit >= 0) {
         struct hwbreak* bp = &target.bp[target.hit];
         t = bp->type == 1 ? "hwbreak:;" : bp->type == 2 ? "watch:" : "awatch:";
         while(*t) *p++ = *t++;
@@ -401,7 +453,7 @@ static void to_native(struct reg* r, const struct regs* g)
 #undef R
     r->r_rflags = g->eflags;
 }
-static int memory_io(int op, unsigned long long addr, void* buf, size_t n)
+static int raw_memory_io(int op, unsigned long long addr, void* buf, size_t n)
 {
     if(!target.pid || !target.stopped) return -ESRCH;
     if(n && (addr >= (1ull << 47) || n > (1ull << 47) - addr)) return -EFAULT;
@@ -409,9 +461,104 @@ static int memory_io(int op, unsigned long long addr, void* buf, size_t n)
     int r = call(PT_IO, target.pid, &io, 0);
     return r < 0 ? r : io.piod_len == n ? 0 : -EFAULT;
 }
+static int plant_int3(unsigned long long addr)
+{
+    unsigned char insn = INT3;
+    return raw_memory_io(PIOD_WRITE_D, addr, &insn, 1);
+}
+static int sw_index(unsigned long long addr)
+{
+    for(int i = 0; i < MAX_SWBREAK; i++)
+        if(target.sw[i].used && target.sw[i].address == addr) return i;
+    return -1;
+}
+static int memory_io(int op, unsigned long long addr, void* buf, size_t n)
+{
+    unsigned char* bytes = buf;
+    if(n > MAX_MEMORY) return -EINVAL;
+    if(n && (addr >= (1ull << 47) || n > (1ull << 47) - addr)) return -EFAULT;
+    int overlap = 0;
+    for(int i = 0; i < MAX_SWBREAK; i++)
+        if(target.sw[i].used && target.sw[i].address >= addr &&
+           target.sw[i].address - addr < n) overlap = 1;
+    if(op == PIOD_WRITE_D && target.poisoned) return -EIO;
+    if(op == PIOD_WRITE_D && overlap) {
+        unsigned char before[MAX_MEMORY], desired[MAX_MEMORY], observed[MAX_MEMORY];
+        int r = raw_memory_io(PIOD_READ_D, addr, before, n);
+        if(r < 0) return r;
+        __builtin_memcpy(desired, bytes, n);
+        /* Keep traps installed throughout the write; shadow bytes are committed
+         * only after the entire physical write has been verified. */
+        for(int i = 0; i < MAX_SWBREAK; i++)
+            if(target.sw[i].used && target.sw[i].address >= addr &&
+               target.sw[i].address - addr < n)
+                desired[target.sw[i].address - addr] = INT3;
+        r = raw_memory_io(PIOD_WRITE_D, addr, desired, n);
+        if(!r) {
+            r = raw_memory_io(PIOD_READ_D, addr, observed, n);
+            if(!r && __builtin_memcmp(observed, desired, n)) r = -EIO;
+        }
+        if(r < 0) {
+            /* A rejected or short transfer may still have changed memory.
+             * Verify restoration even if the rollback syscall reports failure. */
+            int restored = !raw_memory_io(PIOD_READ_D, addr, observed, n) &&
+                !__builtin_memcmp(observed, before, n);
+            if(!restored) {
+                (void)raw_memory_io(PIOD_WRITE_D, addr, before, n);
+                restored = !raw_memory_io(PIOD_READ_D, addr, observed, n) &&
+                    !__builtin_memcmp(observed, before, n);
+            }
+            if(!restored) target.memory_poisoned = target.poisoned = 1;
+            return r;
+        }
+        for(int i = 0; i < MAX_SWBREAK; i++)
+            if(target.sw[i].used && target.sw[i].address >= addr &&
+               target.sw[i].address - addr < n)
+                target.sw[i].original = bytes[target.sw[i].address - addr];
+        return 0;
+    }
+    int r = raw_memory_io(op, addr, buf, n);
+    if(r < 0) return r;
+    if(op == PIOD_READ_D) for(int i = 0; i < MAX_SWBREAK; i++)
+        if(target.sw[i].used && target.sw[i].address >= addr &&
+           target.sw[i].address - addr < n)
+            bytes[target.sw[i].address - addr] = target.sw[i].original;
+    return 0;
+}
+static int sw_breakpoint(int insert, unsigned long long addr, unsigned len)
+{
+    if(len != 0 && len != 1) return -EINVAL;
+    if(addr >= (1ull << 47)) return -EINVAL;
+    if(target.poisoned) return -EIO;
+    int slot = sw_index(addr);
+    if(insert) {
+        if(slot >= 0) return 0;
+        for(slot = 0; slot < MAX_SWBREAK; slot++) if(!target.sw[slot].used) break;
+        if(slot == MAX_SWBREAK) return -ENOSPC;
+        unsigned char original = 0, planted = 0;
+        int r = raw_memory_io(PIOD_READ_D, addr, &original, 1);
+        if(r < 0) return r;
+        r = plant_int3(addr);
+        if(r < 0) return r;
+        r = raw_memory_io(PIOD_READ_D, addr, &planted, 1);
+        if(r < 0 || planted != INT3) {
+            (void)raw_memory_io(PIOD_WRITE_D, addr, &original, 1);
+            return r < 0 ? r : -EIO;
+        }
+        target.sw[slot] = (struct swbreak){addr, original, 1};
+        return 0;
+    }
+    if(slot < 0) return 0;
+    int r = raw_memory_io(PIOD_WRITE_D, addr, &target.sw[slot].original, 1);
+    if(r < 0) { target.poisoned = 1; return r; }
+    target.sw[slot].used = 0;
+    if(target.sw_hit == slot) target.sw_hit = -1;
+    return 0;
+}
 static int breakpoint(int insert, unsigned type, unsigned long long addr, unsigned len)
 {
-    if(type == 0 || type == 3 || type > 4) return 1; /* unsupported */
+    if(type == 3 || type > 4) return 1; /* unsupported */
+    if(type == 0) return sw_breakpoint(insert, addr, len);
     if(!hwbreak_valid(type, addr, len)) return -EINVAL;
 #if !defined(PROCESS_DEBUGGER_TEST)
     /* The retail 13.60 data-watchpoint path did not pass console validation.
@@ -441,7 +588,7 @@ static int breakpoint(int insert, unsigned type, unsigned long long addr, unsign
     if(r < 0) target.bp[slot] = old;
     return r;
 }
-static int resume_process(int step, lwpid_t tid, int sig)
+static int resume_run(int step, lwpid_t tid, int sig)
 {
     if(target.poisoned) return -EIO;
     int r = refresh_threads();
@@ -470,11 +617,42 @@ static int resume_process(int step, lwpid_t tid, int sig)
     }
     if((r = call(PT_CONTINUE, target.pid, (void*)1, sig)) < 0) goto undo;
     target.last_step = step;
+    target.step_thread = step ? tid : 0;
+    target.step_complete = 0;
     target.stopped = 0;
     return wait_stop(1);
 undo:
     if(restore_thread_control() < 0) target.poisoned = 1;
     return r;
+}
+static int resume_process(int step, lwpid_t tid, int sig)
+{
+    if(target.poisoned) return -EIO;
+    if(target.sw_hit >= 0 && target.sw[target.sw_hit].used) {
+        int slot = target.sw_hit;
+        lwpid_t hit_thread = target.stopped_thread;
+        lwpid_t requested = tid ? tid : target.resume_thread > 0 ? target.resume_thread : target.selected;
+        unsigned long long addr = target.sw[slot].address;
+        struct reg regs;
+        int r = call(PT_GETREGS, hit_thread, &regs, 0);
+        if(r < 0) return r;
+        /* A client may have moved RIP or asked to step another LWP. In either
+         * case leave the trap installed and honor that explicit operation. */
+        if((unsigned long long)regs.r_rip != addr || (step && requested != hit_thread))
+            return resume_run(step, tid, sig);
+        unsigned char original = target.sw[slot].original;
+        r = raw_memory_io(PIOD_WRITE_D, addr, &original, 1);
+        if(r < 0) { target.poisoned = 1; return r; }
+        target.sw_hit = -1;
+        r = resume_run(1, hit_thread, 0);
+        if(r == 1) return r; /* The process exited; there is no byte to replant. */
+        if(!target.stopped) { target.poisoned = 1; return r < 0 ? r : -EIO; }
+        int planted = plant_int3(addr);
+        if(planted < 0) { target.poisoned = 1; return planted; }
+        if(r < 0 || step || !target.step_complete) return r;
+        return resume_run(0, tid, sig);
+    }
+    return resume_run(step, tid, sig);
 }
 
 __attribute__((noinline)) static void validation_tick(void)
@@ -521,7 +699,7 @@ static int dispatch(const char* packet)
     const char* p = packet;
     unsigned long long a, b, c;
     int r = 0;
-    if(prefix(p, "qSupported")) return reply("PacketSize=1000;qXfer:features:read+;vContSupported+;hwbreak+");
+    if(prefix(p, "qSupported")) return reply("PacketSize=1000;qXfer:features:read+;vContSupported+;hwbreak+;swbreak+");
     if(eq(p, "!")) return reply("OK");
     if(eq(p, "vMustReplyEmpty")) return reply("");
     if(eq(p, "qAttached")) return reply(target.pid ? "1" : "0");
@@ -678,8 +856,8 @@ static int dispatch(const char* packet)
     }
     if(*p == 'm' || *p == 'M') {
         int mode = *p++;
-        if(hexnum(&p, &a) || *p++ != ',' || hexnum(&p, &b) || b > 1024) return error_reply(EINVAL);
-        unsigned char bytes[1024];
+        if(hexnum(&p, &a) || *p++ != ',' || hexnum(&p, &b) || b > MAX_MEMORY) return error_reply(EINVAL);
+        unsigned char bytes[MAX_MEMORY];
         char out[2049];
         if(mode == 'M') {
             if(*p++ != ':') return error_reply(EINVAL);
@@ -780,16 +958,42 @@ int main(void)
         setsockopt(gdb_socket, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
         serve();
         /* On disconnect, keep the server alive until detach succeeds. Exiting
-         * while attached could kill the target on FreeBSD-derived kernels. */
-        while(target.pid && detach_process() < 0) {
+         * while attached could kill the target on FreeBSD-derived kernels.
+         * Retry transient detach failures a bounded number of times, then stop:
+         * a poisoned or persistently un-detachable target is left stopped and
+         * alive for manual recovery, not resumed, killed, or spun on forever
+         * while flooding the log. */
+        for(int tries = 0; target.pid && detach_process() < 0; ) {
+            if(target.memory_poisoned || ++tries >= DETACH_RETRIES) {
+#ifndef PROCESS_DEBUGGER_TEST
+                (void)restore_credentials();
+#endif
+                const char wedged[] = "process-debugger: cannot detach; target left stopped, "
+                    "manual recovery required\n";
+                write(1, wedged, sizeof(wedged)-1);
+                for(;;) { struct timespec idle = {3600, 0}; nanosleep(&idle, 0); }
+            }
             const char failed[] = "process-debugger: detach failed; retrying without exiting\n";
             write(1, failed, sizeof(failed)-1);
             struct timespec delay = {1, 0}; nanosleep(&delay, 0);
         }
 #ifndef PROCESS_DEBUGGER_TEST
-        while(restore_credentials()) {
+        /* No target is attached here (detach already succeeded), so the risk is
+         * the reverse of detach: a live process holding elevated credentials.
+         * Retry a bounded number of times, then exit so process teardown drops
+         * the elevated ucred rather than leaking it under an endless retry. */
+        for(int tries = 0; restore_credentials(); ) {
             const char failed[] = "process-debugger: credential restore failed; retrying\n";
             write(1, failed, sizeof(failed)-1);
+            if(++tries >= CREDENTIAL_RETRIES) {
+                const char giving_up[] = "process-debugger: credential restore failed repeatedly; "
+                    "exiting to drop elevated credentials\n";
+                write(1, giving_up, sizeof(giving_up)-1);
+                close(gdb_socket);
+                cleanup_test();
+                close(listener);
+                return 3;
+            }
             struct timespec delay = {1, 0}; nanosleep(&delay, 0);
         }
 #endif

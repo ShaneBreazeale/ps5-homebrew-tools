@@ -89,9 +89,10 @@ nearby instructions, then decide whether the budget allows another step.
 Never replace this with an unlimited `while`/auto-continue script. A selected
 GDB thread does not isolate `continue` to that thread.
 
-Use `hbreak` for a verified runtime user address, never `break` or an assumed
-software-breakpoint fallback. GDB may defer the actual Z1 insertion until
-resume. Keep breakpoint numbers owned by this session and remove only those.
+Use `break` for a verified runtime user address on a kstuff session (`Z0` /
+`INT3`, host-tested). Use `hbreak` only when a debug-register slot is free.
+GDB may defer the actual Z0/Z1 insertion until resume. Keep breakpoint numbers
+owned by this session and remove only those.
 The default profile sets the hardware-watchpoint limit to zero; do not issue
 `watch` and rely on GDB's software-watchpoint fallback. Z2/Z4 are disabled on
 retail 13.60, and a raw maintenance packet cannot enable them.

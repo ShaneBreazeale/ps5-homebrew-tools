@@ -66,6 +66,7 @@ kernel targets.
 | SDK/LLVM 18 build | [Building](BUILDING.md), including gpubox paths in validation |
 | Other collectors / captures | [Tool index](README.md), [capture tools](CAPTURE_TOOLS.md) |
 | Resident event decoding | [Log tools](LOG_TOOLS.md) and the exact producing profile |
+| Kernel readiness and fallback | [Versioned provider and legacy policy](KERNEL_READINESS.md) |
 | Kernel offsets and inspection phase | [Kernel backend](KERNEL_DEBUGGER.md); no execution adapter yet |
 | Offset/patch/dump analysis | [Analysis tools](ANALYSIS_TOOLS.md) |
 | Native app build | [Native app](NATIVE_APP.md) |

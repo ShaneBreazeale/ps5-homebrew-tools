@@ -8,9 +8,10 @@ Commands in the guides run from the repository root unless stated otherwise.
 | Guide | Use it to |
 | --- | --- |
 | [Build reference](BUILDING.md) | Configure the SDK and select Make targets |
+| [Kernel readiness and fallback](KERNEL_READINESS.md) | Integrate versioned readiness with a restricted legacy-cookie fallback |
 | [Kernel offset backend](KERNEL_DEBUGGER.md) | Resolve explicit anchors and inspect a gated kernel instruction; no traps yet |
 | [Process debugger CLI](DEBUGGER.md) | Build, log, attach by PID, inspect, step and detach |
-| [Host utilities](../host/README.md) | Send once, preserve output, and summarize v2 captures |
+| [Host utilities](../host/README.md) | Send once, classify a failed session, preserve output, and summarize v2 captures |
 | [Process snapshot](../payloads/process-snapshot/README.md) | Take one filtered process snapshot |
 | [Process watch](../payloads/process-watch/README.md) | Watch process changes during an app launch |
 | [Resident snapshot](../payloads/resident-snapshot/README.md) | Read matching resident counters and event rings |

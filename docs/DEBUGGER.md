@@ -21,8 +21,9 @@ a stock GDB client has not yet passed live integration testing with this stub.
 | Instruction step | Single selected LWP; other enumerated LWPs suspended during step | Single-thread child passed |
 | Continue | Resumes process; waits for next stop | Execution breakpoint reached on child |
 | Hardware execution breakpoints | Free DR0–DR3 slots shared across current LWPs | Child-only slot lease used to prove an execution trap |
+| Software breakpoints (`Z0`) | Plant `INT3` in the process; at most 64; no debug-register slots | Host-tested (insert, shadow, hit, step-over, occupied DRs). Not console-tested |
 | Z2/Z4 data watchpoints | Rejected on retail 13.60 | Insertions in an earlier build did not fire |
-| Software breakpoints / read-only watchpoints | Unsupported | No claim |
+| Read-only watchpoints | Unsupported | No claim |
 | Detach / disconnect restoration | Explicit detach and cleanup paths exist | Some detach replies OK; full execution/reconnect test incomplete |
 | Kernel breakpoint at `0xcfc12` | Not supported | Requires a separate kernel backend |
 
@@ -184,7 +185,7 @@ A backtrace (`bt 8`) may help if matching relocated symbols and unwind data are
 available. Failed unwinding is not proof of a kernel hang or the absence of a
 caller. Avoid evaluating target function calls through `print` or `call`.
 
-## 6. Step and use hardware execution breakpoints
+## 6. Step and use breakpoints
 
 For one authorized instruction step:
 
@@ -195,12 +196,25 @@ x/8i $pc
 ```
 
 Bound the number of steps and capture each stop. `next`, `nexti`, `finish`,
-`until`, source-level `step`, and inferior function calls can depend on temporary
-software breakpoints or additional protocol features. Do not assume they work
-because `stepi` does. Scheduler-locking settings do not establish a new server
-guarantee: `continue` resumes the process, not just the selected thread.
+`until`, source-level `step`, and inferior function calls plant temporary
+software breakpoints. Those `Z0` packets are implemented; the combined GDB
+workflows are not console-tested. Scheduler-locking settings do not establish a
+new server guarantee: `continue` resumes the process, not just the selected thread.
 
-Use a verified **runtime user address** for a hardware breakpoint:
+On a kstuff session, use a software breakpoint. It plants `INT3` and does not
+need a debug-register slot:
+
+```gdb
+break *0xVERIFIED_RUNTIME_USER_ADDRESS
+info breakpoints
+continue
+```
+
+Inspect the RSP log for `Z0` / `OK` and a later stop containing `swbreak:;`.
+GDB's `break` is the kstuff-compatible path. `hbreak` still needs a free DR.
+
+Use a verified **runtime user address** for a hardware breakpoint when slots
+are free:
 
 ```gdb
 hbreak *0xVERIFIED_RUNTIME_USER_ADDRESS
@@ -213,11 +227,11 @@ is only a client request; inspect the RSP log for the Z1 reply and the subsequen
 stop. Stop execution with Ctrl-C if the agreed stop condition is not reached;
 wait for a stop reply before issuing inspection or detach commands.
 
-If all four DR slots are occupied, the server returns ENOSPC. In run 003 they
-were already occupied by kstuff-related state. Do not clear those registers,
-borrow kernel slots, restart kstuff, or enable a PCB-writing flag. The
-`qPS5:test-hardware` lease is restricted to the server's own disposable child
-and cannot repair slot exhaustion in a real application.
+If all four DR slots are occupied, `Z1` returns ENOSPC. Use `break` / `Z0`
+instead. In run 003 the slots were already occupied by kstuff-related state.
+Do not clear those registers, borrow kernel slots, restart kstuff, or enable a
+PCB-writing flag. The `qPS5:test-hardware` lease is restricted to the server's
+own disposable child and cannot repair slot exhaustion in a real application.
 
 Remove only breakpoints created by this session, using their GDB numbers:
 
@@ -275,7 +289,7 @@ establish the actual session state before another action.
 | Observation | Interpretation and next action |
 | --- | --- |
 | No ready marker | Loader/runtime status unknown or bind/startup failed; preserve log; do not resend automatically |
-| Connection refused | No reachable listener at this address/port; confirm current session, build port and ownership |
+| Connection refused on 1234 | No GDB listener at the debugger port; confirm the process-debugger payload is running. For loader port 9021, classify ping vs send with [black-session classes](TROUBLESHOOTING.md#black-session-classes) |
 | TCP connects but commands stall | Another client or cleanup may own the server; stop duplicate clients and establish ownership |
 | Attach returns ESRCH | PID missing, dead, inaccessible, or not visible under current platform rules; do not substitute a title ID |
 | Attach EACCES/EPERM | SDK kernel/credential access or target policy unavailable; do not patch a system process to make it work |

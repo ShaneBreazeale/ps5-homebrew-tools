@@ -23,13 +23,16 @@
     "Check the compatibility guide before using a payload; kernel capture requires the matching PS5 Pro 13.60 instrumentation and page map.",
     "Distinguish a successful local build or host-side transfer from console runtime validation.",
     "Send payloads once and preserve the raw capture and metadata sidecar; do not automatically retry after a timeout.",
+    "Classify a black or frozen console from ICMP ping plus a real send; host/session_health.py never connects to port 9021. Ping alive and loader refused is elfldr_dead (power-hold). Ping dead is kernel_unreachable (power-hold). Ping alive after a successful send with a black picture is loader_ready (resident-snapshot once). HDMI black plus two beeps is display_sync / Safe Mode.",
     "For process-debugger tasks read DEBUGGER_RECOVERY, DEBUGGER_VALIDATION, DEBUGGER, DEBUGGER_AGENTS and DEBUGGER_PROTOCOL before live CLI work; current source and session evidence override stale snippets.",
     "The process debugger attaches to one usermode PID and cannot trap kernel offset 0xcfc12; title IDs are not PIDs and arbitrary system/game attachment remains unvalidated.",
     "Retail 13.60 Z2/Z4 data watchpoints remain disabled. PROCESS_DEBUGGER_KERNEL_DBREGS is retired and rejected; never deploy the historical PCB fallback into a kstuff session.",
-    "Hardware slots may already belong to kstuff. Preserve other owners and report ENOSPC; the test-child slot lease is not available for real applications.",
+    "Hardware slots may already belong to kstuff. Preserve other owners and report ENOSPC for Z1; use Z0 software INT3 breakpoints instead. The test-child slot lease is not available for real applications.",
+    "Software breakpoint memory writes commit shadows only after verified completion; failed partial writes restore prior bytes or poison further memory writes/resume and refuse detach that would run unrestored memory. Hidden step-over runs the hit LWP and auto-continues only after its verified trace stop; other signals/stops are reported. These paths are host-tested, not console-validated.",
     "Use one RSP client and bounded execution; source docs/debugger/compat.gdb before connecting. A successful register readback is not evidence that a watchpoint fires.",
     "Preserve existing user authorization, identify the current target/session, log commands and cleanup state, and do not automatically resend, reconnect, kill or reboot after a timeout.",
     "Keep LLVM 18 and the standard Payload SDK build; gpubox is the recorded workspace build host. Do not substitute LLVM 23 or a research-runtime ELF.",
-    "For kernel-offset work read KERNEL_DEBUGGER.md: exec+0xcfc12 = text+0x38fc12 = data-0x9303ee only in the checked profile. The separate SDK backend inspects gated bytes; it implements no kernel trap, watchpoint, stop, step or resume. A dated probe is not console readiness or whole-kernel identity."
+    "For kernel-offset work read KERNEL_DEBUGGER.md: exec+0xcfc12 = text+0x38fc12 = data-0x9303ee only in the checked profile. The separate SDK backend inspects gated bytes; it implements no kernel trap, watchpoint, stop, step or resume. A dated probe is not console readiness or whole-kernel identity.",
+    "Kernel inspection readiness uses KERNEL_READINESS.md: default builds require an explicitly linked versioned provider; legacy-cookie fallback is opt-in and read-only. Never fall back after a malformed, stale, initializing, failed or changing handshake. Schema-2 evidence distinguishes readiness sources; existing residents are not automatically upgraded. Draft residents/readiness loader/service tests cover packed TSS fields and publication/revocation only, not a working installer or syscall transport."
   ]
 }

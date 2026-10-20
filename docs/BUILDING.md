@@ -115,3 +115,12 @@ meanings to its words even if the total size matches.
 
 Compiler success is not a runtime compatibility check. No build target uploads
 anything or connects to a console.
+
+## Kernel readiness provider
+
+The kernel-offset default requires an explicitly linked readiness provider; no
+current resident gains that interface automatically. The optional
+`KERNEL_OFFSET_PROVIDER` source and opt-in
+`CPPFLAGS=-DKERNEL_OFFSET_LEGACY_FALLBACK=1` build mode are documented in
+[readiness and fallback](KERNEL_READINESS.md#build-modes). Use a fresh build
+directory when switching modes. Both remain inspection-only.

@@ -31,7 +31,7 @@ Implemented packets are not evidence of successful console validation.
 
 | Packet | Reply / behavior | Limit |
 | --- | --- | --- |
-| `qSupported:...` | `PacketSize=1000;qXfer:features:read+;vContSupported+;hwbreak+` | Features advertise implementation, not validated runtime support |
+| `qSupported:...` | `PacketSize=1000;qXfer:features:read+;vContSupported+;hwbreak+;swbreak+` | Features advertise implementation, not validated runtime support |
 | `!` | `OK` | Extended mode acknowledgement; does not implement launch |
 | `vMustReplyEmpty` | Empty packet | Negotiation |
 | `qAttached` | `1` with a target PID; otherwise `0` | Does not independently prove a successful stopped attach |
@@ -106,11 +106,11 @@ the target stops/exits. There is no immediate `OK` for c/s. Do not send another
 request on that connection while a resume reply is pending. A controller timeout
 is not evidence that the process stopped or that the breakpoint was ineffective.
 
-## Hardware breakpoints
+## Breakpoints
 
 | Packet type | Meaning | Current status |
 | --- | --- | --- |
-| `Z0` / `z0` | Software breakpoint | Unsupported (empty reply) |
+| `Z0` / `z0` | Software breakpoint | Implemented: plant `INT3` (`0xCC`) in the process. Kind 0 or 1. At most 64. Host-tested; not console-tested. Does not use debug registers |
 | `Z1` / `z1` | Execution breakpoint | Kind/length must be 1; a common free slot is required |
 | `Z2` / `z2` | Write watchpoint | Disabled on retail 13.60; earlier insertions failed to fire |
 | `Z3` / `z3` | Read-only watchpoint | Unsupported (empty reply) |
@@ -135,6 +135,19 @@ error, not a hidden method of enabling 13.60 watchpoints.
 ## Stop replies
 
 - `Tss` includes `thread:TID;` for a stopped target.
+- Software breakpoint stops include `swbreak:;`. RIP is rewound to the
+  planted `INT3`. Continue restores the original byte, steps that instruction
+  with other enumerated LWPs suspended and replants `INT3`. It continues
+  automatically only after a SIGTRAP with trace metadata from that same LWP;
+  unexpected signals, traps or other LWP stops are returned to the client.
+  Changing Hg/Hc does not redirect the internal step to another LWP.
+- Memory `m`/`M` overlays the original instruction byte so GDB does not see
+  `0xCC`. Writes overlapping software breakpoints keep traps installed and
+  commit shadow bytes only after a complete write/readback transaction. Failed
+  or partial writes restore the previous bytes; unverifiable restoration poisons
+  further memory writes, resumes and breakpoint changes. Detach refuses an
+  unrestored memory transaction because detach would resume the process.
+  Otherwise, detach restores every original byte.
 - Proven hardware execution events can include `hwbreak:;`.
 - Data-watchpoint formatting exists for `watch:ADDRESS;` and `awatch:ADDRESS;`,
   but no successful retail 13.60 data-watchpoint test is claimed.

@@ -8,7 +8,7 @@ It is not a kernel debugger and cannot trap kernel offset `0xcfc12`.
 
 | Guide | Contents |
 | --- | --- |
-| [CLI runbook](../../docs/DEBUGGER.md) | Build on gpubox, deploy once, log, attach, inspect, step, use hardware execution breakpoints, detach |
+| [CLI runbook](../../docs/DEBUGGER.md) | Build on gpubox, deploy once, log, attach, inspect, step, software/hardware breakpoints, detach |
 | [LLM / CLI / GDB-MI contract](../../docs/DEBUGGER_AGENTS.md) | Session facts, bounded automation, MI state handling, evidence handoff |
 | [Packet reference](../../docs/DEBUGGER_PROTOCOL.md) | Actual RSP subset, GP layout, identifiers, custom packets, limits and errors |
 | [Recovery and kernel scope](../../docs/DEBUGGER_RECOVERY.md) | Offline console, kstuff slot ownership, Chain Test constraints, retired PCB fallback |
@@ -19,9 +19,12 @@ It is not a kernel debugger and cannot trap kernel offset `0xcfc12`.
 
 Historical PS5 Pro 13.60 tests passed child-process attachment, GP register and
 memory read/write/restore, instruction stepping, and a hardware execution trap
-using slots leased only in our own disposable child. The full console validator
-has never passed. A stock GDB/MI client, arbitrary system/game attachment,
-multithread execution and complete disconnect/resume cleanup remain unvalidated.
+using slots leased only in our own disposable child. Software breakpoints (`Z0`,
+`INT3`) are implemented and host-tested so a kstuff session can still break
+without a free debug-register slot. They are not console-tested. The full
+console validator has never passed. A stock GDB/MI client, arbitrary
+system/game attachment, multithread execution and complete disconnect/resume
+cleanup remain unvalidated.
 
 Data watchpoints Z2/Z4 did not fire in the earlier 13.60 tests and remain
 explicitly disabled there. **They are not fixed.** The source now checks address/

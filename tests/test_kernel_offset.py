@@ -12,7 +12,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'host'))
-from kernel_offset import DEFAULT_PROFILE, load_profile, load_probe, plan
+from kernel_offset import DEFAULT_PROFILE, load_profile, load_probe, plan, readiness_evidence, validate_probe
 
 
 class KernelOffsetTests(unittest.TestCase):
@@ -106,6 +106,77 @@ class KernelOffsetTests(unittest.TestCase):
             subprocess.run([*compiler, '-std=c11', '-Wall', '-Wextra', '-Werror',
                             str(ROOT/'tests/test_kernel_offset.c'), '-o', str(executable)], check=True)
             subprocess.run([str(executable)], check=True)
+
+    def test_schema2_handshake_evidence(self):
+        evidence = {
+            'source': 'versioned_handshake', 'fallback_reason': None, 'legacy_profile': None,
+            'abi_version': 1, 'record_size': 160, 'state': 2, 'active_hooks': 0, 'cr3': '0x1000',
+            'build_id': '5a'*32, 'session_id': '01'*16, 'generation': '0x4',
+            'capabilities': '0x1', 'expected_cpus': '0x3', 'completed_cpus': '0x3',
+            'challenge': '01'*16, 'final_challenge': '02'*16
+        }
+        probe = {**self.probe, 'schema': 2, 'readiness': evidence}
+        report = plan(self.dump, self.profile, 'text', 0x112, probe)
+        self.assertTrue(report['runtime_observation']['readiness']['fresh_handshake'])
+        changes = {'source': 'none', 'fallback_reason': 'provider_unavailable', 'legacy_profile': 'something',
+                   'abi_version': 2, 'record_size': 159, 'state': 1, 'active_hooks': 1, 'cr3': '0x1',
+                   'build_id': '00'*32, 'session_id': '00'*16, 'generation': 0, 'capabilities': 3,
+                   'expected_cpus': '0x10000', 'completed_cpus': 1,
+                   'challenge': 'bad', 'final_challenge': '01'*16}
+        for key, value in changes.items():
+            invalid = {**probe, 'readiness': {**evidence, key: value}}
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                plan(self.dump, self.profile, 'text', 0x112, invalid)
+
+    def test_schema2_legacy_evidence_is_distinct_and_restricted(self):
+        evidence = {
+            'source': 'legacy_cookie', 'fallback_reason': 'provider_unavailable', 'legacy_profile': 'resume-13.60-pro-v1',
+            'abi_version': 0, 'record_size': 0, 'state': 0, 'active_hooks': 0, 'cr3': '0x0',
+            'build_id': '00'*32, 'session_id': '00'*16, 'generation': 0,
+            'capabilities': 0, 'expected_cpus': 0, 'completed_cpus': 0,
+            'challenge': '00'*16, 'final_challenge': '00'*16
+        }
+        probe = {**self.probe, 'schema': 2, 'readiness': evidence}
+        report = plan(self.dump, self.profile, 'text', 0x112, probe)
+        self.assertFalse(report['runtime_observation']['readiness']['fresh_handshake'])
+        for key, value in [('fallback_reason', 'bad_reply'), ('legacy_profile', 'guessed'),
+                           ('capabilities', 1), ('session_id', '01'*16)]:
+            invalid = {**probe, 'readiness': {**evidence, key: value}}
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                plan(self.dump, self.profile, 'text', 0x112, invalid)
+        old = plan(self.dump, self.profile, 'text', 0x112, self.probe)
+        self.assertEqual(old['runtime_observation']['readiness']['source'], 'legacy_schema1_unreported')
+
+    def test_actual_payload_json_contract(self):
+        # Run the real payload main with a native SDK shim, then its real parser.
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            (folder/'ps5').mkdir()
+            (folder/'ps5/kernel.h').write_text('''#include <stdint.h>
+#include <stddef.h>
+extern const intptr_t KERNEL_ADDRESS_TEXT_BASE, KERNEL_ADDRESS_DATA_BASE;
+uint32_t kernel_get_fw_version(void);
+int kernel_copyout(intptr_t, void *, size_t);
+''')
+            compiler = shlex.split(os.environ.get('HOST_CC', 'cc'))
+            for present in (False, True):
+                executable = folder/('provider' if present else 'no-provider')
+                flags = ['-DTEST_PROVIDER', '-DKERNEL_OFFSET_HAS_PROVIDER=1', '-DKERNEL_OFFSET_LEGACY_FALLBACK=1'] if present else []
+                subprocess.run([*compiler, '-std=c11', '-Wall', '-Wextra', '-Werror', '-I', str(folder),
+                                *flags, str(ROOT/'tests/test_kernel_offset_output.c'), '-o', str(executable)], check=True)
+                for mode in (['', 'unavailable', 'initializing', 'malformed'] if present else ['']):
+                    result = subprocess.run([str(executable), *([mode] if mode else [])], text=True, capture_output=True)
+                    self.assertTrue(result.stdout.startswith('KOFFSET_JSON='), result.stderr)
+                    probe = json.loads(result.stdout.split('=', 1)[1])
+                    success = present and mode in ('', 'unavailable')
+                    self.assertEqual(result.returncode, 0 if success else 1)
+                    if success:
+                        validate_probe(probe, load_profile(DEFAULT_PROFILE))
+                        self.assertEqual(readiness_evidence(probe)['source'],
+                                         'legacy_cookie' if mode else 'versioned_handshake')
+                    else:
+                        self.assertEqual(probe['bytes_read'], 0)
+                        self.assertNotEqual(probe['readiness']['source'], 'legacy_cookie')
 
     def test_shipped_profile_and_payload_constants_agree(self):
         profile = load_profile(DEFAULT_PROFILE)

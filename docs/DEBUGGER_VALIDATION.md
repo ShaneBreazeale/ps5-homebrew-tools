@@ -79,6 +79,9 @@ for exactly which commands completed; no full validator run passed.
   authorized test. The historical direct-PCB fallback is retired from current
   source, its build macro is rejected, and it must not be sent into kstuff.
   See [recovery and kernel scope](DEBUGGER_RECOVERY.md).
+- Console-test `Z0` software breakpoints on the disposable child, including a
+  kstuff-resident session where all four DR slots are occupied. Host tests
+  cover insert, memory shadow, hit/RIP rewind, step-over, and occupied DRs.
 - Finish data watchpoints, detach/resume, disconnect cleanup, and signal delivery
   tests. Some detach commands returned OK; full post-detach execution and
   reconnect validation did not complete.

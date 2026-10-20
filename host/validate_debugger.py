@@ -70,7 +70,9 @@ def validate(host, port, transcript):
     attached = spawned = False
     checks = []
     try:
-        require("hwbreak+" in remote.request("qSupported:hwbreak+"), "missing hardware support")
+        supported = remote.request("qSupported:hwbreak+;swbreak+")
+        require("hwbreak+" in supported, "missing hardware support")
+        require("swbreak+" in supported, "missing software breakpoint support")
         response = remote.request("qPS5:spawn-test")
         require(not response.startswith("E"), f"test-child creation failed: {response}")
         spawned = True
@@ -115,6 +117,11 @@ def validate(host, port, transcript):
         response = remote.request("vCont;s:" + tid)
         require(response.startswith("T05"), f"single-step failed: {response}")
         checks.append("instruction single-step")
+        ok(f"Z0,{pc:x},1")
+        stop = remote.request("c")
+        require(stop.startswith("T05") and "swbreak:;" in stop, f"missing software breakpoint stop: {stop}")
+        ok(f"z0,{pc:x},1")
+        checks.append("software execution breakpoint")
         debug_registers = remote.request("qPS5:dbregs")
         ok("qPS5:test-hardware")
         for kind, addr, length, reason in ((1, pc, 1, "hwbreak:;"),

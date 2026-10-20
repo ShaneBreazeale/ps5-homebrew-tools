@@ -65,7 +65,7 @@ out/resident-snapshot.elf: payloads/resident-snapshot/main.c vendor/kstuff/uelf/
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) -Ivendor -Ivendor/kstuff $(LDFLAGS) -o $@ $< $(LDLIBS)
 	$(link_cleanup)
 
-$(addprefix out/,$(addsuffix .elf,process-watch process-snapshot thread-probe-v1 thread-probe-v2 kernel-capture capture-export kernel-offset)): out/%.elf: payloads/%/main.c | out
+$(addprefix out/,$(addsuffix .elf,process-watch process-snapshot thread-probe-v1 thread-probe-v2 kernel-capture capture-export)): out/%.elf: payloads/%/main.c | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
 	$(link_cleanup)
 
@@ -79,4 +79,9 @@ out/process-debugger.elf: payloads/process-debugger/main.c payloads/process-debu
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
 	$(link_cleanup)
 
-out/kernel-offset.elf: payloads/kernel-offset/backend.h payloads/kernel-capture/paging.h payloads/kernel-capture/profile_13_60_pro.h
+# Provider source is explicitly chosen by the operator/integrator. Empty means
+# the normal build fails closed; a legacy-only build requires an explicit flag.
+KERNEL_OFFSET_PROVIDER ?=
+out/kernel-offset.elf: payloads/kernel-offset/main.c payloads/kernel-offset/backend.h payloads/kernel-offset/readiness.h payloads/kernel-capture/paging.h payloads/kernel-capture/profile_13_60_pro.h $(KERNEL_OFFSET_PROVIDER) | out
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(if $(strip $(KERNEL_OFFSET_PROVIDER)),-DKERNEL_OFFSET_HAS_PROVIDER=1) $(LDFLAGS) -o $@ $< $(KERNEL_OFFSET_PROVIDER) $(LDLIBS)
+	$(link_cleanup)

@@ -10,8 +10,10 @@ import sys
 
 if __package__:
     from .capture_manifest import file_identity, new_manifest, utc_now, write_manifest
+    from .session_health import classify_connect_failure, format_report
 else:
     from capture_manifest import file_identity, new_manifest, utc_now, write_manifest
+    from session_health import classify_connect_failure, format_report
 
 
 def positive_timeout(value):
@@ -93,6 +95,11 @@ def main(argv=None):
             except OSError as error:
                 manifest['transport']['error'] = str(error)
                 manifest['transport']['outcome'] += '_error'
+                if manifest['transport']['outcome'] == 'connecting_error':
+                    health = classify_connect_failure(
+                        args.host, error, loader_port=args.port)
+                    manifest['session_health'] = health
+                    print(format_report(health), file=sys.stderr)
                 raise
             finally:
                 capture.flush()

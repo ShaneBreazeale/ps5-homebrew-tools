@@ -58,8 +58,55 @@ def load_probe(path):
     return probe
 
 
+def readiness_evidence(probe):
+    if probe['schema'] == 1:
+        return {'source': 'legacy_schema1_unreported', 'fresh_handshake': False}
+    record = probe['readiness']
+    if not isinstance(record, dict):
+        raise ValueError('invalid readiness evidence')
+    source = record.get('source')
+    def hex_bytes(key, size):
+        value = record[key]
+        if not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{'+str(size*2)+'}', value):
+            raise ValueError(f'invalid readiness {key}')
+        return bytes.fromhex(value)
+    if source == 'versioned_handshake':
+        if record.get('fallback_reason') is not None or record.get('legacy_profile') is not None:
+            raise ValueError('handshake evidence must not claim fallback')
+        if integer(record['abi_version']) != 1 or integer(record['record_size']) != 160:
+            raise ValueError('unsupported readiness ABI')
+        if integer(record['state']) != 2 or integer(record['active_hooks']) != 0:
+            raise ValueError('producer is not ready or hooks remain active')
+        cr3 = integer(record['cr3'])
+        if not 0 < cr3 < 1 << 36 or cr3 & 4095:
+            raise ValueError('invalid readiness CR3')
+        if not any(hex_bytes('build_id', 32)) or not any(hex_bytes('session_id', 16)):
+            raise ValueError('readiness lacks build/session identity')
+        challenge, final = hex_bytes('challenge', 16), hex_bytes('final_challenge', 16)
+        if not any(challenge) or not any(final) or challenge == final:
+            raise ValueError('readiness challenges must be nonzero and distinct')
+        if not 0 < integer(record['generation']) < U64 or integer(record['capabilities']) != 1:
+            raise ValueError('invalid readiness generation/capabilities')
+        cpus = integer(record['expected_cpus'])
+        if not 0 < cpus <= 0xffff or integer(record['completed_cpus']) != cpus:
+            raise ValueError('incomplete readiness CPU mask')
+    elif source == 'legacy_cookie':
+        if record.get('fallback_reason') != 'provider_unavailable' or record.get('legacy_profile') != 'resume-13.60-pro-v1':
+            raise ValueError('unrecognized legacy fallback evidence')
+        for key in ('abi_version', 'record_size', 'state', 'active_hooks', 'cr3',
+                    'generation', 'capabilities', 'expected_cpus', 'completed_cpus'):
+            if integer(record[key]) != 0:
+                raise ValueError('legacy evidence must not claim handshake capabilities')
+        for key, size in [('build_id', 32), ('session_id', 16), ('challenge', 16), ('final_challenge', 16)]:
+            if any(hex_bytes(key, size)):
+                raise ValueError('legacy evidence must not claim fresh identity/challenges')
+    else:
+        raise ValueError('probe lacks accepted readiness evidence')
+    return {**record, 'fresh_handshake': source == 'versioned_handshake'}
+
+
 def validate_probe(probe, profile):
-    if type(probe.get('schema')) is not int or probe['schema'] != 1 or probe.get('profile') != profile['id']:
+    if type(probe.get('schema')) is not int or probe['schema'] not in (1, 2) or probe.get('profile') != profile['id']:
         raise ValueError('probe schema/profile differs')
     if probe.get('status') != 'site_signature_match' or probe.get('trap_supported') is not False:
         raise ValueError('probe did not complete a read-only site signature match')
@@ -78,7 +125,7 @@ def validate_probe(probe, profile):
         raise ValueError('probe bytes differ from the checked site')
     if integer(probe['pid']) <= 1 or integer(probe['observed_at_unix']) <= 0:
         raise ValueError('probe lacks an observation identity/time')
-    return text
+    return text, readiness_evidence(probe)
 
 
 def plan(dump, profile, anchor, offset, probe=None):
@@ -110,7 +157,7 @@ def plan(dump, profile, anchor, offset, probe=None):
                         'A site signature does not attest the whole running kernel or trap ownership.']
     }
     if probe is not None:
-        text = validate_probe(probe, profile)
+        text, readiness = validate_probe(probe, profile)
         address = text + text_offset
         if not kernel_pointer(address):
             raise ValueError('relocated address overflow')
@@ -118,7 +165,8 @@ def plan(dump, profile, anchor, offset, probe=None):
             'address': hex(address), 'kernel_text_va': hex(text),
             'observed_at_unix': integer(probe['observed_at_unix']), 'probe_pid': integer(probe['pid']),
             'target_bytes_observed': text_offset == integer(probe['text_offset']),
-            'whole_kernel_identity_verified': False
+            'whole_kernel_identity_verified': False,
+            'readiness': readiness
         }
     return report
 

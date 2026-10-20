@@ -74,3 +74,11 @@ The separate kernel-offset backend was built with the standard SDK / LLVM
 The [kernel backend build record](KERNEL_DEBUGGER.md#build-evidence--2026-10-18)
 records its exact hash, byte count, offline capture check and undeployed status.
 Kernel trapping, stepping and watchpoints remain unimplemented.
+
+## Kernel readiness follow-up
+
+The versioned readiness client, producer helpers and restricted legacy fallback
+were checked with 54 host tests and standard LLVM 18.1.8 builds on gpubox.
+[Readiness build evidence](KERNEL_READINESS.md#build-evidence--2026-10-18) records
+the exact mode-specific hashes. No resident adapter was installed and no console
+payload was sent.

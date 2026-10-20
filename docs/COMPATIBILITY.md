@@ -8,7 +8,7 @@ match historical binaries or support other consoles and firmware versions.
 
 | Component | Boundary |
 | --- | --- |
-| Kernel offset backend | PS5 Pro 13.60; exact resume cookie/profile and readable audited page; seven-byte exec-join inspection only, no traps or console validation. See [kernel backend](KERNEL_DEBUGGER.md). |
+| Kernel offset backend | PS5 Pro 13.60; versioned readiness provider or explicitly enabled historical cookie/profile fallback, plus readable audited page; seven-byte exec-join inspection only, no traps or console validation. See [kernel backend](KERNEL_DEBUGGER.md). |
 | Process debugger | Usermode PID attach; child-only partial console evidence on Pro 13.60; free DR slots required; Z2/Z4 disabled on retail 13.60; no kernel breakpoints or direct PCB fallback. See [the debugger guide](DEBUGGER.md). |
 | Resident snapshot | A resident implementing `KEKCALL_SHARED_AREA_SNAPSHOT` with this exact snapshot layout |
 | Process watch / process snapshot | Firmware-specific raw `kinfo_proc` offsets, including PID 72, name 447, and thread count 596 |
@@ -47,8 +47,11 @@ match historical binaries or support other consoles and firmware versions.
 ## Sending into a research session
 
 The sender makes no empty loader probes and performs no automatic retries.
-Connection loss or an idle timeout can leave execution state unknown. Preserve
-the capture and establish session state before deciding on another send.
+`session_health.py` pings only; it never connects to the loader port. Loader
+refused or open state comes from a send that already ran, or from an operator
+`--loader-result`. Connection loss or an idle timeout can leave execution state
+unknown. Preserve the capture and classify ping vs loader before deciding on
+another send. See [black-session classes](TROUBLESHOOTING.md#black-session-classes).
 
 Resident experiments change the session's kernel state. The historical workflow
 used a fresh exploit/loader session for each resident and did not resend or

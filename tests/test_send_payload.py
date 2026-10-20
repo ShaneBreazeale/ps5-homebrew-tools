@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 from contextlib import redirect_stderr, redirect_stdout
+import errno
 import json
 import io
 from pathlib import Path
@@ -9,6 +10,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from host import send_payload as sender
+from host import session_health as health
 
 
 class SenderTests(unittest.TestCase):
@@ -44,11 +46,13 @@ class SenderTests(unittest.TestCase):
         self.assertEqual(metadata['capture']['bytes'], 11)
         self.assertEqual(metadata['payload_execution'], 'unknown')
 
+    @patch.object(health, 'ping_host')
     @patch.object(sender.socket, 'create_connection')
-    def test_existing_capture_prevents_any_connection(self, connect):
+    def test_existing_capture_prevents_any_connection(self, connect, ping):
         self.log.write_bytes(b'previous capture')
         self.assertEqual(sender.main(self.args), 1)
         connect.assert_not_called()
+        ping.assert_not_called()
         self.assertEqual(self.log.read_bytes(), b'previous capture')
 
     @patch.object(sender.socket, 'create_connection')
@@ -62,8 +66,9 @@ class SenderTests(unittest.TestCase):
         connect.assert_not_called()
         self.assertFalse(self.log.exists())
 
+    @patch.object(health, 'ping_host')
     @patch.object(sender.socket, 'create_connection')
-    def test_idle_timeout_keeps_partial_capture_without_resending(self, connect):
+    def test_idle_timeout_keeps_partial_capture_without_resending(self, connect, ping):
         connection = MagicMock()
         connect.return_value.__enter__.return_value = connection
         # socket.timeout is distinct from TimeoutError before Python 3.10.
@@ -71,9 +76,11 @@ class SenderTests(unittest.TestCase):
         self.assertEqual(sender.main(self.args), 2)
         connect.assert_called_once()
         connection.sendall.assert_called_once()
+        ping.assert_not_called()
         self.assertEqual(self.log.read_bytes(), b'partial\n')
         metadata = json.loads(Path(str(self.log) + '.json').read_text())
         self.assertEqual(metadata['transport']['outcome'], 'idle_timeout')
+        self.assertNotIn('session_health', metadata)
 
     @patch.object(sender.socket, 'create_connection')
     def test_existing_manifest_prevents_connection(self, connect):
@@ -84,10 +91,30 @@ class SenderTests(unittest.TestCase):
         self.assertEqual(sidecar.read_text(), 'preserved')
         self.assertFalse(self.log.exists())
 
+    @patch.object(health, 'ping_host', return_value='dead')
     @patch.object(sender.socket, 'create_connection', side_effect=OSError('unreachable'))
-    def test_connection_failure_does_not_retry(self, connect):
+    def test_connection_failure_does_not_retry(self, connect, _ping):
         self.assertEqual(sender.main(self.args), 1)
         connect.assert_called_once()
+        metadata = json.loads(Path(str(self.log) + '.json').read_text())
+        self.assertEqual(metadata['transport']['outcome'], 'connecting_error')
+        self.assertEqual(metadata['session_health']['class'], 'kernel_unreachable')
+        self.assertFalse(metadata['session_health']['probed_loader'])
+        self.assertIn('class=kernel_unreachable', self.output.getvalue())
+
+    @patch.object(health, 'ping_host', return_value='alive')
+    @patch.object(
+        sender.socket, 'create_connection',
+        side_effect=OSError(errno.ECONNREFUSED, 'Connection refused'),
+    )
+    def test_connection_refused_classifies_elfldr_dead(self, connect, ping):
+        self.assertEqual(sender.main(self.args), 1)
+        connect.assert_called_once()
+        ping.assert_called_once_with('console.invalid')
+        metadata = json.loads(Path(str(self.log) + '.json').read_text())
+        self.assertEqual(metadata['session_health']['class'], 'elfldr_dead')
+        self.assertEqual(metadata['session_health']['loader'], 'refused')
+        self.assertIn('power-hold', metadata['session_health']['next'])
 
     @patch.object(sender.socket, 'create_connection')
     def test_bad_connection_options_fail_before_connect(self, connect):

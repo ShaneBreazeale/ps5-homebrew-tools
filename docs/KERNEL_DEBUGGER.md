@@ -67,17 +67,20 @@ make kernel-offset check
 ```
 
 The result is `out/kernel-offset.elf`. The backend checks firmware/model, canonical
-aligned live bases, text/data separation, pmap pointers and CR3 bounds. It reads
-the matching resume cookie and requires hook state zero, then walks the target
-page tables and refuses missing, protected, invalid or unreadable mappings.
+aligned live bases, text/data separation, pmap pointers and CR3 bounds. It then
+requires a valid versioned readiness handshake, or an explicitly selected legacy
+cookie fallback, and audits page permissions. Read the [readiness interface and
+fallback guide](KERNEL_READINESS.md) for provider integration, build modes and
+strict downgrade rules. The normal build refuses when no provider is linked.
 Only after those gates does it read the seven-byte instruction and compare it
 with the checked image. There is no credential change, kernel write, PCB access,
 IDT/TSS change, kernel function call or debug-register operation in this backend.
-It reuses the existing kernel-capture page walker and resume profile, not
-prosper0gdb's kernel entry path.
+It reuses the existing kernel-capture page walker and firmware layout, with the
+resume cookie confined to legacy mode. It does not enter prosper0gdb.
 
-A normal kstuff session is not presumed to satisfy the resume-instrumentation
-gates. Refusal is expected when that evidence is absent. Do not patch the cookie,
+A normal kstuff session is not presumed to implement the new interface or
+satisfy the legacy resume-instrumentation gates. Refusal is expected without
+the appropriate reviewed adapter or explicitly selected historical profile. Do not patch the cookie,
 clear protection, run suspend/resume, or install a different resident merely to
 make the probe pass. Reads do not freeze other CPUs; mapping/state can change
 between a page audit and copyout. This is not a coherent kernel snapshot.
@@ -89,7 +92,7 @@ is supplied as an offline test. The payload emits one line beginning
 
 | Field | Meaning |
 | --- | --- |
-| `schema`, `profile` | Version 1 and exact checked profile ID |
+| `schema`, `profile` | Version 2 and exact checked profile ID |
 | `pid`, `observed_at_unix` | Payload process and console-clock observation time |
 | `firmware_raw`, `soc_id` | Observed firmware/model identifiers |
 | `kernel_text_va`, `kernel_data_va` | SDK bases from that invocation |
@@ -97,11 +100,12 @@ is supplied as an offline test. The payload emits one line beginning
 | `status` | Match, mismatch or explicit refusal/error |
 | `bytes_read`, `observed` | Seven bytes after a successful site read; otherwise zero/empty |
 | `trap_supported` | Always false |
+| `readiness` | Source and versioned identity/capability evidence, or explicit legacy fallback; see [readiness](KERNEL_READINESS.md) |
 
 Statuses are `site_signature_match`, `unsupported_firmware_model`, `invalid_bases`,
 `metadata_read_error`, `invalid_pmap`, `unverified_resume_state`, `page_missing`,
 `page_protected`, `invalid_page_table`, `page_table_read_error`, `site_read_error`,
-and `site_signature_mismatch`. Payload exit 0 requires a match; other statuses
+and `site_signature_mismatch`, plus the [readiness refusal statuses](KERNEL_READINESS.md#json-and-host-handling). Payload exit 0 requires a match; other statuses
 return 1. Sender success is not payload success.
 
 The host planner can consume a saved JSON observation or a full sender log with
@@ -112,8 +116,9 @@ python3 host/kernel_offset.py --dump "$KERNEL_DUMP" --anchor exec --offset 0xcfc
   --probe "$SESSION/kernel-offset.log"
 ```
 
-It validates the profile, firmware/model, layout, site address, byte count and
-signature before relocation. The output calls the result `runtime_observation`:
+It validates the profile, firmware/model, layout, site address, byte count,
+signature and schema-2 readiness evidence before relocation. Older schema-1
+records are explicitly labelled as unreported legacy evidence. The output calls the result `runtime_observation`:
 a saved log can be stale, and console clocks can be wrong. This command neither
 connects nor establishes present readiness. For another offset,
 `target_bytes_observed` is false. Even a matching site leaves
@@ -159,6 +164,10 @@ or kstuff coexistence. Record an exact LLVM 18 ELF hash separately from those
 host checks. This backend has not been deployed or console-validated.
 
 ### Build evidence — 2026-10-18
+
+This historical record predates the readiness-handshake change. See
+[readiness verification](KERNEL_READINESS.md#verification-boundary) for the new
+source and its separate build evidence.
 
 Built on gpubox in `/tmp/ps5-kernel-offset-HSfy8t` through
 `make kernel-offset process-debugger check`, with the staged public SDK and

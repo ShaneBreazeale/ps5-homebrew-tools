@@ -87,8 +87,11 @@ ends with `procwatch: complete births=... deaths=...`.
 
 Use a new log filename for every run. The sender sends once and never retries.
 Its exit status describes the host connection; check the payload's output for
-completion. A timeout can leave the payload running. See the
-[host reference](host/README.md) for options, exit codes, and offline summaries.
+completion. A timeout can leave the payload running. After a failed connect,
+the sender pings once and records a session class; `host/session_health.py`
+classifies ping vs a send that already ran and never opens port 9021. See the
+[host reference](host/README.md) and
+[black-session classes](docs/TROUBLESHOOTING.md#black-session-classes).
 
 ## Documentation
 

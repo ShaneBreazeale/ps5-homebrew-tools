@@ -74,5 +74,7 @@ any, send time, app launch time, and visible result. Preserve raw captures when
 creating JSON summaries. `captures/` is ignored by Git.
 
 An idle timeout or lost connection can leave the payload running. The sender
-does not retry. Use [Troubleshooting](TROUBLESHOOTING.md) to interpret the result
-before deciding on another run.
+does not retry. Classify ping vs loader with
+`python3 host/session_health.py --host "$PS5_HOST"`; that command never
+connects to port 9021. Use [Troubleshooting](TROUBLESHOOTING.md#black-session-classes)
+to interpret the result before deciding on another run.

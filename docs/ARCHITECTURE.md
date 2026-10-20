@@ -25,7 +25,7 @@ inspection using their tool documentation.
 | Directory | Responsibility |
 | --- | --- |
 | `payloads/` | Independently compiled console tools and their guides |
-| `host/` | Sending, raw capture, and offline interpretation |
+| `host/` | Sending, session classification (ICMP only), raw capture, and offline interpretation |
 | `mk/` | Shared root-build rules using the external SDK |
 | `vendor/` | Imported reader ABI declarations, ioctl definitions and GDB packet transport |
 | `residents/` | Historical profiles, marker meanings, and archived patch scripts |
@@ -60,8 +60,10 @@ interpret the original format accurately.
 
 The separate [kernel offset backend](KERNEL_DEBUGGER.md) resolves explicit
 anchors against a hash-checked raw capture on the host. Its one-shot SDK payload
-uses live SDK bases, the existing resume profile and page walker to inspect one
-seven-byte kernel instruction. It emits a JSON observation, performs no kernel
+uses live SDK bases, an explicitly linked [readiness provider](KERNEL_READINESS.md)
+and the page walker to inspect one seven-byte kernel instruction. A known
+historical resume-cookie fallback requires an explicit build option and cannot
+rescue malformed, stale or changing handshake evidence. It emits a JSON observation, performs no kernel
 writes and installs no trap. A saved observation can relocate a host report but
 cannot establish present readiness, full running-image identity or DR ownership.
 Execution control remains a separate unfinished adapter.

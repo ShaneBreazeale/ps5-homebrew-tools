@@ -24,13 +24,43 @@ the payload's return code. Keep partial output when a run fails.
 | `File exists` | The log is preserved deliberately; use a new capture filename |
 | `No such file or directory` | Check the ELF path and create the parent log directory |
 | ELF validation error | Pass the built `.elf`, not a package, flat binary, or truncated download |
-| Connection refused, unresolved host, or timeout | Check the configured address, port, network, and loader state using the existing setup; avoid empty loader probes |
-| Idle timeout | The payload may still be running; preserve partial output and establish session state before another send |
+| Connection refused, unresolved host, or timeout | Classify ping vs the failed send; see [Black-session classes](#black-session-classes). Do not probe port 9021 |
+| Idle timeout | The loader accepted the ELF (`loader_ready` evidence); the payload may still be running. Preserve partial output and establish session state before another send |
 | Exit code 0 but no useful output | EOF only confirms the stream ended; look for the tool's readiness, completion, or error messages |
 
 `captures/` is local and ignored by Git. Host errors are printed in the terminal,
 so an empty log by itself cannot distinguish a connection failure from an empty
-remote response.
+remote response. A failed connect also writes `session_health` into the log
+sidecar after one ICMP ping.
+
+## Black-session classes
+
+A black or frozen picture needs a ping-vs-loader class. Classify from **ICMP
+ping** and from a **send that already ran**. `host/session_health.py` pings
+only; an empty loader connect consumes elfldr's accept.
+
+```sh
+python3 host/session_health.py --host "$PS5_HOST"
+python3 host/session_health.py --host "$PS5_HOST" --loader-result refused
+python3 host/session_health.py --host "$PS5_HOST" --ping-result alive --loader-result open
+```
+
+`--loader-result` is evidence from a send, not a probe. After a failed
+`send_payload.py` connect, the sender pings once and prints the same class.
+
+| Class | Ping | Loader (from a real send) | Typical picture | Next action |
+| --- | --- | --- | --- | --- |
+| `loader_ready` | alive | connected (send succeeded) | black after a title launch | Send `resident-snapshot` once. Extra non-kstuff diagnostics may follow. Do not send a second kstuff, process-debugger, or kernel-offset |
+| `elfldr_dead` | alive | connection refused | black or frozen | Power-hold recovery. Do not send another ELF into this session |
+| `kernel_unreachable` | dead | n/a (do not probe 9021) | black / no HDMI | Power-hold recovery. Historical KERNEL_DBREGS / run-007 class. Do not send payloads into this boot |
+| `kernel_answers` | alive | unknown (not probed) | any | Send the intended ELF once if a payload is ready. Do not probe port 9021 |
+| `display_sync` | either | n/a | HDMI black + 2 beeps | Safe Mode display reset; this is not a brick. Then classify ping and loader from a new send (`--hdmi-two-beep`) |
+| `loader_silent` | alive | connect timeout | any | Do not retry the loader connect. Power-hold if elfldr was expected |
+| `host_unresolved` | unresolved | n/a | n/a | Check the configured address. Do not probe port 9021 |
+
+Keep process-debugger, kernel-offset, prosper0gdb, and a second kstuff out of
+`elfldr_dead`, `kernel_unreachable`, and `loader_silent`. An idle timeout after
+a successful send is `loader_ready` evidence.
 
 ## Payload output
 

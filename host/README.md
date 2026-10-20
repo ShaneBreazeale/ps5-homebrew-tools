@@ -39,7 +39,41 @@ return value to this script. Check the payload's completion or error messages.
 Only received bytes are stored in the log. The sender's `Sent ...` line and
 local error messages appear in the terminal. A failed connection may leave an
 empty reserved log; keep it and choose a new filename for another deliberate
-attempt after establishing session state.
+attempt after establishing session state. A failed **connect** (before any ELF
+bytes are written) pings once and records `session_health` in the sidecar; it
+does not connect to the loader a second time. An idle timeout after a successful
+send does not ping and is not `elfldr_dead`.
+
+## Classify a console session
+
+```sh
+python3 host/session_health.py --host "$PS5_HOST"
+python3 host/session_health.py --host "$PS5_HOST" --loader-result refused
+python3 host/session_health.py --host "$PS5_HOST" --json --ping-result alive --loader-result open
+```
+
+This tool sends one ICMP ping. It never opens TCP port 9021. Loader
+refused/open/timeout state comes from `--loader-result`, `--loader-error`, or
+from `send_payload.py` after a connect failure. Use `--ping-result` when ping
+was already observed. `--hdmi-two-beep` selects the display-sync class.
+
+| Argument | Default | Meaning |
+| --- | --- | --- |
+| `--host` | Required | Console address or hostname |
+| `--port` | `9021` | Loader port identity in the report; never contacted |
+| `--loader-result` | `unknown` | `unknown`, `open`, `refused`, `timeout`, `unreachable`, `reset`, or `error` |
+| `--loader-error` | unset | Failed-send OSError text; used only when `--loader-result` is `unknown` |
+| `--ping-result` | unset | Skip ICMP and use `alive`, `dead`, `unresolved`, or `unknown` |
+| `--hdmi-two-beep` | off | Operator saw HDMI black with two beeps |
+| `--json` | off | Print the report as JSON |
+
+| Classifier exit code | Meaning |
+| --- | --- |
+| `0` | `kernel_answers` or `loader_ready`; a send may proceed or already succeeded |
+| `1` | Recovery class; do not send another ELF into this session |
+| `2` | Argument error |
+
+Classes and next actions are in [Troubleshooting](../docs/TROUBLESHOOTING.md#black-session-classes).
 
 ## Summarize a v2 capture
 
@@ -78,10 +112,13 @@ profile hash and resolves the investigation's shorthand to raw offset `0x38fc12`
 It makes no connection and emits no breakpoint command. With `--probe LOG`, it
 can relocate from one validated, dated kernel-offset probe observation. See
 [the kernel backend guide](../docs/KERNEL_DEBUGGER.md) for anchors, required
-resume/page gates, refusal statuses and unfinished execution control.
+readiness/page gates, refusal statuses and unfinished execution control. Schema-2
+reports preserve [handshake or legacy evidence](../docs/KERNEL_READINESS.md);
+schema-1 observations are labelled as unreported legacy evidence.
 
 ## Other host tools
 
+- Session classifier: ping vs a real send; never probe 9021. See above.
 - [Capture receiver](../docs/CAPTURE_TOOLS.md): receive and verify a kernel capture.
 - [Log tools](../docs/LOG_TOOLS.md): decode and compare resident captures.
 - [Analysis tools](../docs/ANALYSIS_TOOLS.md): audit offsets, patches, and binary dumps.

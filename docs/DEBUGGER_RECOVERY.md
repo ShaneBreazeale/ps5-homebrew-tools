@@ -21,7 +21,9 @@ The prior Chain Test black-screen observation has these constraints:
 - The existing debugger targets a usermode process and cannot trap kernel offset
   `0xcfc12`.
 - In run 003, all four hardware DR slots were already occupied by kstuff-related
-  state. More GDB breakpoints cannot create additional hardware capacity.
+  state. `Z1` cannot create additional hardware capacity. `Z0` software
+  breakpoints plant `INT3` and do not use those slots; they are host-tested
+  and not yet console-tested.
 
 These are session-specific facts, not permanent properties of every console,
 firmware, process or future run. A new session needs new identity and timing

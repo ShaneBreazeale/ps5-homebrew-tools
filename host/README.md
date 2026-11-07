@@ -116,6 +116,19 @@ readiness/page gates, refusal statuses and unfinished execution control. Schema-
 reports preserve [handshake or legacy evidence](../docs/KERNEL_READINESS.md);
 schema-1 observations are labelled as unreported legacy evidence.
 
+## Stream until the connection dies
+
+```sh
+python3 host/stream_logger.py out/follower-live.elf \
+  --host "$PS5_HOST" --log captures/follower-live-001.log
+```
+
+`stream_logger.py` sends one ELF and writes stdout until the loader
+connection closes. It sets no idle timeout. Use it for `follower-live`
+and `thread-probe-v3`. It refuses to overwrite `--log`. A failed connect
+does not retry and does not classify the session; use `send_payload.py`
+when you need the session-health sidecar.
+
 ## Other host tools
 
 - Session classifier: ping vs a real send; never probe 9021. See above.

@@ -11,12 +11,14 @@ Commands in the guides run from the repository root unless stated otherwise.
 | [Kernel readiness and fallback](KERNEL_READINESS.md) | Integrate versioned readiness with a restricted legacy-cookie fallback |
 | [Kernel offset backend](KERNEL_DEBUGGER.md) | Resolve explicit anchors and inspect a gated kernel instruction; no traps yet |
 | [Process debugger CLI](DEBUGGER.md) | Build, log, attach by PID, inspect, step and detach |
-| [Host utilities](../host/README.md) | Send once, classify a failed session, preserve output, and summarize v2 captures |
+| [Host utilities](../host/README.md) | Send once, stream until the connection dies, classify a failed session, and summarize v2 captures |
 | [Process snapshot](../payloads/process-snapshot/README.md) | Take one filtered process snapshot |
 | [Process watch](../payloads/process-watch/README.md) | Watch process changes during an app launch |
 | [Resident snapshot](../payloads/resident-snapshot/README.md) | Read matching resident counters and event rings |
 | [Thread probe v1](../payloads/thread-probe-v1/README.md) | Inspect raw sysctl records and selector availability |
 | [Thread probe v2](../payloads/thread-probe-v2/README.md) | Capture selected processes' kernel thread records |
+| [Thread probe v3](../payloads/thread-probe-v3/README.md) | Walk one title's kernel threads until the process leaves |
+| [Follower-live](../payloads/follower-live/README.md) | Stream new resident ring words and first-seen ioctl commands |
 | [Kernel capture and export](CAPTURE_TOOLS.md) | Collect and transfer a matching kernel-text capture |
 | [Log tools](LOG_TOOLS.md) | Decode and compare resident captures |
 | [Analysis tools](ANALYSIS_TOOLS.md) | Validate offsets and audit patches offline |

@@ -74,6 +74,8 @@ a successful send is `loader_ready` evidence.
 | V2: `cycle_detected` or `read_or_owner_failed` | A bounded traversal stopped; retain the partial records and note the incomplete thread set |
 | Sysctl `ENOENT` on a selector | Some researched selectors are unavailable; v1 can retain other useful raw output |
 | An expected process/event is absent | Check launch timing, polling gaps, ring overwrite, and whether that logging path was armed |
+| `nmount_trap` stays 0 while a title mounts | On 13.60 the PPR mount is a pfs SM ioctl, group `0x32` (for example `0x80103207`), not `nmount`. Look for `ioctl-com-new` with `group=0x32` |
+| No group `0x32` in the ioctl table | The shared-area table records commands the resident chose to observe. Absence means this resident did not record the pfs command |
 
 ## Offline summary
 

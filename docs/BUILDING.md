@@ -67,12 +67,14 @@ that artifact. Builds made before these rules, for example with Homebrew LLVM
 | Command | Result |
 | --- | --- |
 | `make` or `make help` | Show targets without requiring an SDK |
-| `make all` | Compile both debugger/inspection tools, seven diagnostic payloads and the minimal payload |
+| `make all` | Compile both debugger/inspection tools, nine diagnostic payloads and the minimal payload |
 | `make resident-snapshot process-watch` | Compile selected payloads |
 | `make kernel-offset` | Build the kernel offset inspection payload; see [kernel backend](KERNEL_DEBUGGER.md) |
 | `make process-debugger` | Build the usermode GDB server; see [debugger runbook](DEBUGGER.md) |
 | `make process-snapshot` | Compile the one-shot process snapshot tool |
 | `make thread-probe-v1 thread-probe-v2` | Compile the raw collectors |
+| `make thread-probe-v3` | Compile the repeating title walker; pair it with `host/stream_logger.py` |
+| `make follower-live` | Compile the resident ring and ioctl streamer |
 | `make kernel-capture capture-export` | Build the collector and exporter |
 | `make bundle` | Build payloads and package source, binaries, SHA-256 inventory, and toolchain versions |
 | `make container-build` | Build all payloads in the pinned reference container |

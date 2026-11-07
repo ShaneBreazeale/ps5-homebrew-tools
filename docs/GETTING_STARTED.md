@@ -62,6 +62,8 @@ the payload's output to determine whether its work completed.
 | What did the already-loaded instrumented resident record? | [Resident snapshot](../payloads/resident-snapshot/README.md); confirm its snapshot ABI first |
 | Which sysctl selectors return useful data? | [Thread probe v1](../payloads/thread-probe-v1/README.md) |
 | What thread records remain in the researched 13.60 environment? | [Thread probe v2](../payloads/thread-probe-v2/README.md) |
+| What is one title doing across a wedge or a long launch? | [Thread probe v3](../payloads/thread-probe-v3/README.md) with [stream_logger.py](../host/stream_logger.py) |
+| Which resident events and ioctl commands appear during a launch? | [Follower-live](../payloads/follower-live/README.md). On 13.60 a PPR mount is ioctl group `0x32`, not `nmount` |
 
 Keep app launch timing and resident identity alongside the capture. Process watch
 and thread probes are separate payloads; this repository does not orchestrate

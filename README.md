@@ -22,10 +22,13 @@ Choose a tool for the question you want to answer:
 | [Resident snapshot](payloads/resident-snapshot/README.md) | Read three snapshots of counters and event rings from a matching instrumented kstuff resident |
 | [Thread probe v1](payloads/thread-probe-v1/README.md) | Capture raw sysctl records and check which selectors are available |
 | [Thread probe v2](payloads/thread-probe-v2/README.md) | Capture selected processes' kernel thread records on firmware 13.60, SoC `0x840fd0` |
+| [Thread probe v3](payloads/thread-probe-v3/README.md) | Keep capturing one title's kernel thread records while the app is alive |
+| [Follower-live](payloads/follower-live/README.md) | Stream new resident ring words and first-seen ioctl commands until the session ends |
 | [Kernel capture](docs/CAPTURE_TOOLS.md) and [capture export](docs/CAPTURE_TOOLS.md) | Collect and transfer a bounded kernel-text capture on the matching PS5 Pro 13.60 setup |
 | [Native app starter](docs/NATIVE_APP.md) | Build a controller, logging, and notification app folder and ZIP |
 
-The [host utilities](host/README.md) send payloads, preserve raw output, and provide
+The [host utilities](host/README.md) send payloads, preserve raw output, stream
+a follower or thread walk until the connection dies, and provide
 [log decoding](docs/LOG_TOOLS.md), [binary analysis](docs/ANALYSIS_TOOLS.md), and
 thread summaries. The
 [minimal payload template](templates/minimal-payload/README.md) provides a starting
@@ -74,6 +77,21 @@ python3 host/send_payload.py out/process-snapshot.elf \
 Look for `shellshot: ready`, the process records, and
 `shellshot: complete procs=...`. Received output is displayed in the terminal and
 saved to the log.
+
+### Stream a resident while a title launches
+
+`follower-live` needs an instrumented kstuff already loaded in this boot.
+It prints each new ring word once, and each tracked ioctl command the
+first time that command appears. On firmware 13.60 a PPR mount is a pfs
+SM ioctl, group `0x32`, not `nmount`.
+
+```sh
+python3 host/stream_logger.py out/follower-live.elf \
+  --host "$PS5_HOST" --log captures/follower-live-001.log
+```
+
+The stream logger has no idle timeout. It writes until the loader
+connection dies. See [follower-live](payloads/follower-live/README.md).
 
 ### Watch an app launch
 

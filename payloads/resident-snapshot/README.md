@@ -41,7 +41,7 @@ imported source. After attachment, expect three metric groups beginning with
 | `core`, `dispatch`, `crypto`, and other groups | Accumulated resident counters |
 | `syscall[name]` | Arming, trap, and emulation counters for that syscall |
 | `ppr_lifetime outstanding=...` | Snapshot of the tracked outstanding-pair gauge |
-| `ioctl-com-meta` / `ioctl-com[index]` | Bounded ioctl tracking table and overflow information |
+| `ioctl-com-meta` / `ioctl-com[index]` | Bounded ioctl tracking table and overflow information. Group `0x32` is the 13.60 pfs SM transport. `nmount` staying at 0 during a title launch is expected. The table lists commands this resident recorded |
 
 Each pass starts its ring cursors at zero, so the same available window can
 appear three times. Compare sequence numbers and counters; repeated printed

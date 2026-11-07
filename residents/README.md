@@ -1,5 +1,18 @@
 # Resident instrumentation experiments
 
+The [kernel patch toolkit](../docs/KERNEL_PATCH_TOOLKIT.md) under `patch/`
+provides an exact-policy transaction core with verified writes/restoration,
+session revocation, replay handling and a separate inspection/write capability
+contract. Its host backend mutates only synthetic memory. No live write
+transport or resident adapter is installed; kernel code mutation is refused.
+
+The [stage 2 integration](../docs/KERNEL_PATCH_STAGE2.md) now supplies a pinned,
+private source overlay for kstuff-lite `47da23b`, with a query-only bearer-authenticated
+dispatch, append-only shared inspection state, bootstrap readbacks and an SDK
+client. Source preparation leaves the existing checkout untouched. The actual
+dispatch/bridge and bootstrap helper are SDK-compile-checked; no full resident
+installer or console validation is supplied. Write capabilities remain disabled.
+
 These names identify experimental kstuff resident variants used during PS5 Pro
 13.60 research. They are not independently loadable diagnostic tools or validated
 launch fixes. None is built by the root Makefile.
@@ -51,3 +64,8 @@ indicator 1 records an attempted flag write, not proof the write succeeded.
 
 Other historical profiles reused markers with different fields. A future shared
 logging API must version event schemas before combining those profiles.
+
+The [stage 3 owned-cell adapter](../docs/KERNEL_PATCH_STAGE3.md) adds one fixed
+resident-owned test variable, a cross-CPU gate/lease, in-memory journal and
+authenticated exercise/recovery dispatch. It is host-tested and SDK compile-checked;
+full resident linking, installation and console validation remain pending.

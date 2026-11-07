@@ -5,7 +5,7 @@ CONTAINER ?= docker
 CONTAINER_IMAGE ?= ps5-homebrew-tools-build
 TOOLS := kernel-offset process-debugger resident-snapshot process-watch process-snapshot thread-probe-v1 thread-probe-v2 thread-probe-v3 follower-live kernel-capture capture-export minimal-payload
 
-.PHONY: help all checksums container-build check check-python check-paging native-check native-app clean bundle reader3 procwatch shellshot $(TOOLS)
+.PHONY: help all checksums container-build check check-python check-paging kernel-patch-check kernel-patch-host kernel-patch-stage2 kernel-patch-stage2-check kernel-patch-stage3 kernel-patch-stage3-query kernel-patch-stage3-check native-check native-app clean bundle reader3 procwatch shellshot $(TOOLS)
 
 help:
 	@echo 'PS5 Homebrew Tools'
@@ -16,6 +16,15 @@ help:
 	@echo '  make checksums           Write out/SHA256SUMS for built payloads'
 	@echo '  make native-app          Build the native starter app folder and ZIP'
 	@echo '  make check               Run host tests (no SDK or console required)'
+	@echo '  make kernel-patch-host   Build the offline patch transaction simulator'
+	@echo '  make kernel-patch-check  SDK-compile the patch core (object only)'
+	@echo '  make kernel-patch-stage2  SDK-build the read-only stage 2 client (provider-free default)'
+	@echo '  make kernel-patch-stage2-check  Compile a prepared private resident overlay'
+	@echo '  make kernel-patch-stage3  SDK-build the owned-cell exercise client (provider-free default)'
+	@echo '  make kernel-patch-stage3-query  SDK-build a strictly read-only recovery client'
+	@echo '  make kernel-patch-stage3-check  Compile a prepared private stage 3 overlay'
+	@echo '  make kernel-patch-resident  Link a private resident and compile its actual installer'
+	@echo '  make kernel-patch-campaign  Run the host-only transfer-fault experiment'
 	@echo '  make native-check        Rebuild the native runtime and verify pinned checksums (no SDK)'
 	@echo '  make clean               Remove generated payloads'
 	@echo 'Historical names: make reader3, procwatch, shellshot copy the renamed tools.'
@@ -26,6 +35,44 @@ all:
 
 $(TOOLS):
 	$(MAKE) -f mk/payloads.mk out/$@.elf
+
+kernel-patch-check:
+	$(MAKE) -f mk/payloads.mk out/kernel-patch-core-check.o
+
+kernel-patch-stage2:
+	$(MAKE) -f mk/payloads.mk out/kernel-patch-stage2.elf
+
+kernel-patch-stage2-check:
+	$(MAKE) -f mk/payloads.mk out/kernel-patch-stage2-resident-check.o out/kernel-patch-stage2-dispatch-check.o out/kernel-patch-stage2-loader-check.o
+
+kernel-patch-stage3:
+	$(MAKE) -f mk/payloads.mk out/kernel-patch-stage3.elf
+
+kernel-patch-stage3-query:
+	$(MAKE) -f mk/payloads.mk out/kernel-patch-stage3-query.elf
+
+kernel-patch-stage3-check:
+	$(MAKE) -f mk/payloads.mk out/kernel-patch-stage3-resident-check.o out/kernel-patch-stage3-dispatch-check.o out/kernel-patch-stage3-loader-check.o
+
+kernel-patch-host: out/host/kernel-patch-sim
+
+KERNEL_PATCH_CAMPAIGN_OUTPUT ?=
+.PHONY: kernel-patch-campaign
+kernel-patch-campaign: export HOST_CC := $(HOST_CC)
+kernel-patch-campaign:
+	$(PYTHON) host/kernel_patch_campaign.py $(if $(strip $(KERNEL_PATCH_CAMPAIGN_OUTPUT)),--output "$(KERNEL_PATCH_CAMPAIGN_OUTPUT)")
+
+# Private complete resident link; never part of all, bundle or deployment.
+KERNEL_PATCH_RESIDENT_OBS ?= 0
+.PHONY: kernel-patch-resident
+kernel-patch-resident:
+	$(if $(strip $(KERNEL_PATCH_RESIDENT_OVERLAY)),,$(error Set KERNEL_PATCH_RESIDENT_OVERLAY to an overlay prepared with --link-inputs))
+	$(if $(strip $(KERNEL_PATCH_RESIDENT_OUTPUT)),,$(error Set KERNEL_PATCH_RESIDENT_OUTPUT to a new private build directory))
+	$(PYTHON) tooling/build_kernel_patch_resident.py --overlay "$(KERNEL_PATCH_RESIDENT_OVERLAY)" --output "$(KERNEL_PATCH_RESIDENT_OUTPUT)" --obs "$(KERNEL_PATCH_RESIDENT_OBS)"
+
+out/host/kernel-patch-sim: tooling/kernel_patch_sim.c tooling/kernel_patch_sim.h residents/patch/patch.h
+	mkdir -p $(@D)
+	$(HOST_CC) -std=c11 -O2 -g -Wall -Wextra -Werror -o $@ $<
 
 reader3: resident-snapshot
 	cp out/resident-snapshot.elf out/reader3.elf

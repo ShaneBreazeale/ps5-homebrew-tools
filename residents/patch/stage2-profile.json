@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "id": "kstuff-lite-47da23b-stage2-inspection-v1",
+  "commit": "47da23b70685651a475d20247a3c4f2cac433eb4",
+  "firmware": "0x13600000",
+  "soc": "0x840fd0",
+  "files": {
+    "ps5-kstuff/main.c": "a0926ef20c3e13690300b58b5767692c4fc758a2370db015ba14b3436f6a34f4",
+    "ps5-kstuff/uelf/main.c": "7c566ea81e67a03e6a2e09981388aea59544f0a5fec8a9dea39c853e6ed5ea96",
+    "ps5-kstuff/uelf/kekcall.c": "dd43efbb499964483cba543558fff084e96b082d74d7c18e49b41641d2ed421b",
+    "ps5-kstuff/uelf/shared_area.h": "5bb3b10925605bc94fcdcbae7b2be995bd9e64b4f72f870e1113e945855f003d",
+    "ps5-kstuff/uelf/utils.h": "8ba30e5181aa4009b1ba97fcfc188d5b58ebd133a82f33ebb903be2060981b26",
+    "ps5-kstuff/uelf/utils.c": "a96e84d7d82012701e82f5d739fc736dea3b84fc9c601115e1a04179fd72e489",
+    "ps5-kstuff/structs-ps5.inc": "784ef37f989bf0fd58e0c2443562550ff4c15042a8fa512a1dbc21b55b04a8bf",
+    "ps5-kstuff/Makefile": "1a00fffe0e5b8d57cf82edf97e198ca6428db68b28a7a1f6126aa8b92c501e1f"
+  }
+}

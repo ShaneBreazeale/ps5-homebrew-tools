@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "id": "synthetic-owned-variable",
+  "firmware": "0x13600000",
+  "soc": "0x840fd0",
+  "image": {
+    "sha256": "5f7cd22ef30cc78868f27696fbb650f4c66b89f7bb1322cfaccde4a871e67ca3",
+    "size": 32,
+    "anchors": {
+      "resident": 0,
+      "data": "-0x1000000"
+    }
+  },
+  "patches": [
+    {
+      "id": "test-variable",
+      "kind": "test_data",
+      "anchor": "resident",
+      "offset": 0,
+      "alignment": 8,
+      "expected": "6f726967696e616c",
+      "replacement": "6d6f646966696564",
+      "undo": "6f726967696e616c",
+      "review": "Synthetic host-owned bytes only."
+    }
+  ]
+}

@@ -16,6 +16,7 @@ Choose a tool for the question you want to answer:
 | Tool | Use it to |
 | --- | --- |
 | [Kernel offset backend](docs/KERNEL_DEBUGGER.md) | Resolve checked kernel offsets and inspect the exec-join bytes; execution control unfinished, no console validation |
+| [Kernel patch toolkit](docs/KERNEL_PATCH_TOOLKIT.md) | Plan a patch, simulate verified writes on synthetic memory, and check saved evidence; no console validation |
 | [Process debugger](payloads/process-debugger/README.md) | Attach by PID, inspect registers/memory, step instructions, and set hardware execution breakpoints; partial console validation |
 | [Process snapshot](payloads/process-snapshot/README.md) | Take one snapshot of shell and app-related processes |
 | [Process watch](payloads/process-watch/README.md) | Watch process births, disappearances, and zombie transitions over three minutes |
@@ -28,7 +29,8 @@ Choose a tool for the question you want to answer:
 | [Native app starter](docs/NATIVE_APP.md) | Build a controller, logging, and notification app folder and ZIP |
 
 The [host utilities](host/README.md) send payloads, preserve raw output, stream
-a follower or thread walk until the connection dies, and provide
+a follower or thread walk until the connection dies, simulate kernel-patch
+transactions offline, and provide
 [log decoding](docs/LOG_TOOLS.md), [binary analysis](docs/ANALYSIS_TOOLS.md), and
 thread summaries. The
 [minimal payload template](templates/minimal-payload/README.md) provides a starting

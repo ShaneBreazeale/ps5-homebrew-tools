@@ -148,3 +148,34 @@ exercises the process debugger with its own disposable child and preserves a
 non-overwritten JSON transcript and payload hash. It requires a running debugger
 (default port 1234) and currently fails at the known-unvalidated data watchpoint
 check on retail 13.60. See [the CLI runbook](../docs/DEBUGGER.md), [agent guide](../docs/DEBUGGER_AGENTS.md), and [recovery note](../docs/DEBUGGER_RECOVERY.md).
+
+## Offline kernel patch toolkit
+
+`kernel_patch.py` validates hash-checked manifests, generates independently reviewed
+resident policy headers, encodes saved requests and simulates the portable C
+transaction service. Build its private-memory backend with `make kernel-patch-host`.
+The [toolkit guide](../docs/KERNEL_PATCH_TOOLKIT.md) includes a synthetic example,
+fault injection, evidence formats and the adapter contract. No command connects
+to a console; saved identity inputs do not prove readiness. Live resident
+integration and kernel code mutation remain unfinished.
+
+`kernel_patch.py stage2-decode` validates exactly one saved `KP_STAGE2_JSON`
+observation against an independently pinned build and checks both challenges,
+identity consistency and the SDK environment. The [stage 2 guide](../docs/KERNEL_PATCH_STAGE2.md)
+also covers private source preparation and client builds. Read-only integration
+source and the concrete dispatch are now implemented; full resident and console
+validation, write integration and code mutation remain unfinished.
+
+`kernel_patch.py stage3-decode --log LOG --build BUILD --output NEW_JSON` checks
+saved owned-cell exercise or read-only recovery evidence. It makes no connection.
+See [stage 3](../docs/KERNEL_PATCH_STAGE3.md) for status and cleanup semantics.
+
+## Kernel patch research campaign
+
+`python3 host/kernel_patch_campaign.py --output /NEW/PATH/campaign.json` runs
+the real portable core against 44,256 deterministic host transfer-fault cases.
+It preserves compiler/source identity, commands, diagnostics and explicit failed
+experiments. Existing output files are refused. See the
+[experiment protocol](../docs/KERNEL_PATCH_EXPERIMENTS.md) for falsifiers,
+sensitivity controls and the separate application baseline required to test a
+kernel remedy. It uses no SDK or console connection.

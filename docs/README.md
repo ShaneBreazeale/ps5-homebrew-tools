@@ -10,6 +10,12 @@ Commands in the guides run from the repository root unless stated otherwise.
 | [Build reference](BUILDING.md) | Configure the SDK and select Make targets |
 | [Kernel readiness and fallback](KERNEL_READINESS.md) | Integrate versioned readiness with a restricted legacy-cookie fallback |
 | [Kernel offset backend](KERNEL_DEBUGGER.md) | Resolve explicit anchors and inspect a gated kernel instruction; no traps yet |
+| [Kernel patch toolkit](KERNEL_PATCH_TOOLKIT.md) | Plan patches, generate policies and simulate verified transactions; console validation pending |
+| [Kernel patch experiments](KERNEL_PATCH_EXPERIMENTS.md) | Run the transfer-fault campaign and define baseline/treatment hypotheses |
+| [Kernel patch research](KERNEL_PATCH_RESEARCH.md) | Review the homebrew stability study, control experiments and evidence limits |
+| [Private resident builds](KERNEL_PATCH_BUILD.md) | Pin complete dependencies, link resident images and compile the actual installer source |
+| [Kernel patch stage 2](KERNEL_PATCH_STAGE2.md) | Prepare the pinned private resident overlay, build the authenticated read-only client and verify saved observations |
+| [Kernel patch stage 3](KERNEL_PATCH_STAGE3.md) | Run the authenticated owned-cell write/readback/restore exercise, resident journal and read-only recovery; live validation pending |
 | [Process debugger CLI](DEBUGGER.md) | Build, log, attach by PID, inspect, step and detach |
 | [Host utilities](../host/README.md) | Send once, stream until the connection dies, classify a failed session, and summarize v2 captures |
 | [Process snapshot](../payloads/process-snapshot/README.md) | Take one filtered process snapshot |
@@ -28,6 +34,7 @@ Commands in the guides run from the repository root unless stated otherwise.
 ## Understand and extend the repository
 
 - [Architecture](ARCHITECTURE.md): component boundaries and capture flow.
+- [Kernel patch toolkit proposal](KERNEL_PATCH_TOOLKIT_PLAN.md): implementation tracker for offline manifests, verified writes and unfinished live resident integration.
 - [Context7 guide](CONTEXT7.md): index and use the maintained tool docs.
 - [Compatibility](COMPATIBILITY.md): supported baseline and interpretation limits.
 - [Minimal native app](../templates/minimal-app/README.md): start a controller-based app.

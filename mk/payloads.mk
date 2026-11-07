@@ -61,16 +61,47 @@ all: $(addprefix out/,$(addsuffix .elf,$(TOOLS))) out/minimal-payload.elf
 out:
 	mkdir -p $@
 
-out/resident-snapshot.elf: payloads/resident-snapshot/main.c vendor/kstuff/uelf/shared_area.h vendor/kstuff/uelf/fself.h vendor/kstuff/uelf/syscall_fixes.h vendor/freebsd/sys/ioccom.h | out
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) -Ivendor -Ivendor/kstuff $(LDFLAGS) -o $@ $< $(LDLIBS)
+out/kernel-patch-core-check.o: tests/compile_kernel_patch.c residents/patch/patch.h residents/patch/probe.h | out
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) -ffreestanding -fno-builtin -mno-red-zone -mgeneral-regs-only -c -o $@ $<
+
+# Stage 2 is opt-in and is excluded from all/bundle: configured ELFs contain a
+# private bearer credential. Use a fresh output/build directory when configuring.
+KERNEL_PATCH_STAGE2_CONFIG ?=
+KERNEL_PATCH_STAGE2_OVERLAY ?=
+KPS2_HEADERS := $(wildcard residents/patch/*.h)
+.PHONY: FORCE_KPS2_CLIENT KPS2_VERIFY_OVERLAY
+out/kernel-patch-stage2.elf: FORCE_KPS2_CLIENT payloads/kernel-patch-stage2/main.c residents/patch/stage2_client.c $(KPS2_HEADERS) $(if $(strip $(KERNEL_PATCH_STAGE2_CONFIG)),$(KERNEL_PATCH_STAGE2_CONFIG)/kp_stage2_config.h) | out
+	$(if $(strip $(KERNEL_PATCH_STAGE2_CONFIG)),python3 tooling/verify_kernel_patch_stage2.py --stage 2 --overlay $(KERNEL_PATCH_STAGE2_CONFIG)/..,@true)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(if $(strip $(KERNEL_PATCH_STAGE2_CONFIG)),-DKERNEL_PATCH_STAGE2_HAS_PROVIDER=1 -I$(KERNEL_PATCH_STAGE2_CONFIG)) $(LDFLAGS) -o $@ payloads/kernel-patch-stage2/main.c $(if $(strip $(KERNEL_PATCH_STAGE2_CONFIG)),residents/patch/stage2_client.c) $(LDLIBS)
 	$(link_cleanup)
 
-out/follower-live.elf: payloads/follower-live/main.c vendor/kstuff/uelf/shared_area.h vendor/kstuff/uelf/fself.h vendor/kstuff/uelf/syscall_fixes.h vendor/freebsd/sys/ioccom.h | out
+ifneq ($(strip $(KERNEL_PATCH_STAGE2_OVERLAY)),)
+KPS2_SOURCE := $(KERNEL_PATCH_STAGE2_OVERLAY)/source
+KPS2_UELF := $(KPS2_SOURCE)/ps5-kstuff/uelf
+KPS2_FREESTANDING := -ffreestanding -fno-builtin -mno-red-zone -mgeneral-regs-only -fno-stack-protector
+KPS2_VERIFY_OVERLAY:
+	python3 tooling/verify_kernel_patch_stage2.py --stage 2 --overlay $(KERNEL_PATCH_STAGE2_OVERLAY)
+out/kernel-patch-stage2-resident-check.o: $(KPS2_UELF)/kp_stage2_bridge.c $(wildcard $(KPS2_UELF)/kp_stage2/*.h) | out KPS2_VERIFY_OVERLAY
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(KPS2_FREESTANDING) -nostdinc -isystem $(KPS2_SOURCE)/freebsd-headers -I$(KPS2_UELF) -c -o $@ $<
+out/kernel-patch-stage2-dispatch-check.o: $(KPS2_UELF)/kekcall.c $(wildcard $(KPS2_UELF)/kp_stage2/*.h) | out KPS2_VERIFY_OVERLAY
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(KPS2_FREESTANDING) -nostdinc -isystem $(KPS2_SOURCE)/freebsd-headers -I$(KPS2_UELF) -c -o $@ $<
+out/kernel-patch-stage2-loader-check.o: tests/compile_kernel_patch_stage2.c $(wildcard $(KPS2_UELF)/kp_stage2/*.h) | out KPS2_VERIFY_OVERLAY
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(KPS2_FREESTANDING) -I$(KPS2_UELF) -c -o $@ $<
+else
+out/kernel-patch-stage2-resident-check.o out/kernel-patch-stage2-dispatch-check.o out/kernel-patch-stage2-loader-check.o:
+	$(error Set KERNEL_PATCH_STAGE2_OVERLAY to a freshly prepared private overlay)
+endif
+
+out/resident-snapshot.elf: payloads/resident-snapshot/main.c vendor/kstuff/uelf/shared_area.h vendor/kstuff/uelf/fself.h vendor/kstuff/uelf/syscall_fixes.h vendor/freebsd/sys/ioccom.h | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) -Ivendor -Ivendor/kstuff $(LDFLAGS) -o $@ $< $(LDLIBS)
 	$(link_cleanup)
 
 $(addprefix out/,$(addsuffix .elf,process-watch process-snapshot thread-probe-v1 thread-probe-v2 thread-probe-v3 kernel-capture capture-export)): out/%.elf: payloads/%/main.c | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
+	$(link_cleanup)
+
+out/follower-live.elf: payloads/follower-live/main.c vendor/kstuff/uelf/shared_area.h vendor/kstuff/uelf/fself.h vendor/kstuff/uelf/syscall_fixes.h vendor/freebsd/sys/ioccom.h | out
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) -Ivendor -Ivendor/kstuff $(LDFLAGS) -o $@ $< $(LDLIBS)
 	$(link_cleanup)
 
 out/kernel-capture.elf: payloads/kernel-capture/paging.h payloads/kernel-capture/profile_13_60_pro.h
@@ -89,3 +120,29 @@ KERNEL_OFFSET_PROVIDER ?=
 out/kernel-offset.elf: payloads/kernel-offset/main.c payloads/kernel-offset/backend.h payloads/kernel-offset/readiness.h payloads/kernel-capture/paging.h payloads/kernel-capture/profile_13_60_pro.h $(KERNEL_OFFSET_PROVIDER) | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(if $(strip $(KERNEL_OFFSET_PROVIDER)),-DKERNEL_OFFSET_HAS_PROVIDER=1) $(LDFLAGS) -o $@ $< $(KERNEL_OFFSET_PROVIDER) $(LDLIBS)
 	$(link_cleanup)
+
+# Private stage 3 owned-cell client. Excluded from all and public bundles.
+KERNEL_PATCH_STAGE3_CONFIG ?=
+KERNEL_PATCH_STAGE3_OVERLAY ?=
+.PHONY: FORCE_KPS3_CLIENT KPS3_VERIFY_OVERLAY
+out/kernel-patch-stage3.elf out/kernel-patch-stage3-query.elf: FORCE_KPS3_CLIENT payloads/kernel-patch-stage3/main.c residents/patch/stage3_client.c $(KPS2_HEADERS) | out
+	$(if $(strip $(KERNEL_PATCH_STAGE3_CONFIG)),python3 tooling/verify_kernel_patch_stage2.py --stage 3 --overlay $(KERNEL_PATCH_STAGE3_CONFIG)/..,@true)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(if $(filter out/kernel-patch-stage3-query.elf,$@),-DKERNEL_PATCH_STAGE3_QUERY_ONLY=1) $(if $(strip $(KERNEL_PATCH_STAGE3_CONFIG)),-DKERNEL_PATCH_STAGE3_HAS_PROVIDER=1 -I$(KERNEL_PATCH_STAGE3_CONFIG)) $(LDFLAGS) -o $@ payloads/kernel-patch-stage3/main.c $(if $(strip $(KERNEL_PATCH_STAGE3_CONFIG)),residents/patch/stage3_client.c) $(LDLIBS)
+	$(link_cleanup)
+
+ifneq ($(strip $(KERNEL_PATCH_STAGE3_OVERLAY)),)
+KPS3_SOURCE := $(KERNEL_PATCH_STAGE3_OVERLAY)/source
+KPS3_UELF := $(KPS3_SOURCE)/ps5-kstuff/uelf
+KPS3_FLAGS := -ffreestanding -fno-builtin -mno-red-zone -mgeneral-regs-only -fno-stack-protector
+KPS3_VERIFY_OVERLAY:
+	python3 tooling/verify_kernel_patch_stage2.py --stage 3 --overlay $(KERNEL_PATCH_STAGE3_OVERLAY)
+out/kernel-patch-stage3-resident-check.o: $(KPS3_UELF)/kp_stage2_bridge.c $(wildcard $(KPS3_UELF)/kp_stage2/*.h) | out KPS3_VERIFY_OVERLAY
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(KPS3_FLAGS) -nostdinc -isystem $(KPS3_SOURCE)/freebsd-headers -I$(KPS3_UELF) -c -o $@ $<
+out/kernel-patch-stage3-dispatch-check.o: $(KPS3_UELF)/kekcall.c $(wildcard $(KPS3_UELF)/kp_stage2/*.h) | out KPS3_VERIFY_OVERLAY
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(KPS3_FLAGS) -nostdinc -isystem $(KPS3_SOURCE)/freebsd-headers -I$(KPS3_UELF) -c -o $@ $<
+out/kernel-patch-stage3-loader-check.o: tests/compile_kernel_patch_stage3.c $(wildcard $(KPS3_UELF)/kp_stage2/*.h) | out KPS3_VERIFY_OVERLAY
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(KPS3_FLAGS) -I$(KPS3_UELF) -c -o $@ $<
+else
+out/kernel-patch-stage3-resident-check.o out/kernel-patch-stage3-dispatch-check.o out/kernel-patch-stage3-loader-check.o:
+	$(error Set KERNEL_PATCH_STAGE3_OVERLAY to a freshly prepared stage 3 overlay)
+endif

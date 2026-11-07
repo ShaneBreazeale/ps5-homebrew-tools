@@ -2,8 +2,9 @@
 
 This is a **usermode, single-process, all-stop** GDB remote server. Use it to
 inspect a known live homebrew process, read GP registers/memory, and step
-instructions. It is not a kernel debugger, launcher, crash-dump server, or
-complete replacement for gdbserver.
+instructions. It is not a kernel debugger, launcher, or complete replacement for gdbserver.
+[Saved stop reports](DEBUGGER_REPORTS.md) retain raw evidence through the existing
+GDB connection for offline searches and cross-reference analysis.
 
 Read [the dated recovery note](DEBUGGER_RECOVERY.md) before a new console run.
 [Validation](DEBUGGER_VALIDATION.md) records what actually passed; the
@@ -17,7 +18,9 @@ a stock GDB client has not yet passed live integration testing with this stub.
 | --- | --- | --- |
 | Attach by numeric PID | One PID; rejects PID 1 and itself; stops process | Disposable child only |
 | Enumerate/select LWPs | At most 256 threads | Child enumeration; multithread control unvalidated |
-| GP registers / small memory reads and writes | Available while stopped; user addresses only | Read/write/restore passed on the child |
+| GP registers / small memory reads and writes | Available while stopped; user addresses only; all current memory-write paths verified | Earlier read/write/restore passed on child; new verification paths host-tested |
+| Process metadata, maps, module addresses | Read-only custom queries; 13.60 metadata/map profile; unavailable selectors/layouts return errors | Host tests/SDK build only |
+| FS/GS bases and XSAVE | Optional read-only ptrace getters; bounded image size | Host tests/SDK build only |
 | Instruction step | Single selected LWP; other enumerated LWPs suspended during step | Single-thread child passed |
 | Continue | Resumes process; waits for next stop | Execution breakpoint reached on child |
 | Hardware execution breakpoints | Free DR0–DR3 slots shared across current LWPs | Child-only slot lease used to prove an execution trap |
@@ -115,7 +118,9 @@ Establish ownership and cleanup first.
 
 ## 4. Connect one GDB client
 
-Use a GDB build with x86-64 support on a host that can reach the console. Obtain
+Use a Python-enabled GDB build with x86-64 and FreeBSD ABI support on a host
+that can reach the console. GDB 15.1 with the FreeBSD target passed a host-only
+report smoke test; console integration remains unvalidated. Obtain
 its version and start without local init files:
 
 ```sh
@@ -131,7 +136,8 @@ source docs/debugger/compat.gdb
 
 This profile only configures the client. It does not connect, attach or resume.
 It selects x86-64/all-stop, bounded connection waits, small memory packets,
-legacy resume packets, and a zero hardware-watchpoint limit. Disabling vCont
+legacy resume packets, and a zero hardware-watchpoint limit. Turning off the
+multi-action verbose-resume packet (`set remote verbose-resume-packet off`)
 avoids GDB emitting a multi-action resume list that this server cannot parse.
 The four-slot client limit is an upper bound, not a grant of four free slots.
 
@@ -168,6 +174,8 @@ info registers
 p/x $pc
 x/8i $pc
 x/8gx $rsp
+maintenance packet qPS5:capabilities
+maintenance packet qPS5:process
 maintenance packet qPS5:dbregs
 ```
 
@@ -241,10 +249,24 @@ delete BREAKPOINT_NUMBER
 
 ## 7. Symbols and ASLR
 
-The server does not provide module mappings, library enumeration, executable
-paths or automatic ASLR relocation. Establish the runtime module identity and
-load bias from independent current-session evidence. A file offset, ELF virtual
-address and runtime address are different quantities.
+The new read-only discovery extensions expose optional process paths, bounded
+map queries, and SDK module basename lookup. They are host-tested and SDK-built;
+the current console has not validated their selectors or layouts. They return
+errors when unavailable and do not automatically relocate GDB symbols:
+
+```gdb
+maintenance packet qPS5:maps:0
+# Hex encoding of the illustrative basename test.sprx:
+maintenance packet qPS5:module:746573742e73707278
+maintenance packet qPS5:regset:fsgs:0,10
+maintenance packet qPS5:regset:xsave:0,100
+```
+
+The [packet reference](DEBUGGER_PROTOCOL.md#read-only-discovery-packets) describes
+flags, hex text, map fingerprints, limits and unsupported results. Establish
+matching module/ELF identity and load bias from current-session evidence. A map
+base, object/file offset, ELF virtual address and runtime address are different
+quantities. A path or module basename alone does not prove matching symbols.
 
 For a PIE ELF with one verified load bias, GDB can relocate local symbols with
 `symbol-file -o LOAD_BIAS /path/to/target.elf`. This is a local symbol operation;

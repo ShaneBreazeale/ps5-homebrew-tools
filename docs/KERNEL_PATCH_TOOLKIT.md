@@ -292,9 +292,9 @@ Remaining plan stages require the selected resident overlay's full build and liv
 validation, reviewed write/hardware adapters and current console readiness. Kernel
 code changes additionally require the real SMP rendezvous, instruction-boundary
 and incoming-flow review, architecture-correct instruction-stream synchronization,
-verified restoration and transport usable while CPUs are parked. Protocol logic
-for an SMP stop is not a substitute for those hardware operations. Code mutation
-remains refused until that integration exists.
+verified restoration and transport usable while CPUs are parked. The existing
+[execution coordinator](KERNEL_EXECUTION.md) supplies protocol logic, not those
+hardware operations. Code mutation remains refused until that integration exists.
 
 ### Build evidence — 2026-10-20
 

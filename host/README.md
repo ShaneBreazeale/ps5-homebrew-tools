@@ -1,7 +1,8 @@
 # Host utilities
 
 Run these commands with Python 3.9+ from the repository root. The scripts use
-the standard library and support `--help`.
+the standard library unless noted and support `--help`. The optional x86-64
+cross-reference decoder uses pinned Capstone; the GDB command runs inside GDB.
 
 ## Send one payload
 
@@ -131,6 +132,8 @@ when you need the session-health sidecar.
 
 ## Other host tools
 
+- [Durable checkpoints](../docs/DURABLE_CHECKPOINTS.md): `checkpoints.py listen` saves each app record before ACK; `ingest` saves raw resident trace/panic streams; `summary` rechecks evidence and identifies pending calls. No console deployment or physical panic driver.
+- [Kernel execution codec](../docs/KERNEL_EXECUTION.md#polled-mailbox-and-offline-host-codec): encode/decode saved mailbox records; no network or live execution adapter.
 - Session classifier: ping vs a real send; never probe 9021. See above.
 - [Capture receiver](../docs/CAPTURE_TOOLS.md): receive and verify a kernel capture.
 - [Log tools](../docs/LOG_TOOLS.md): decode and compare resident captures.
@@ -148,6 +151,15 @@ exercises the process debugger with its own disposable child and preserves a
 non-overwritten JSON transcript and payload hash. It requires a running debugger
 (default port 1234) and currently fails at the known-unvalidated data watchpoint
 check on retail 13.60. See [the CLI runbook](../docs/DEBUGGER.md), [agent guide](../docs/DEBUGGER_AGENTS.md), and [recovery note](../docs/DEBUGGER_RECOVERY.md).
+
+## Debugger stop reports and offline analysis
+
+[Stop-report guide](../docs/DEBUGGER_REPORTS.md) covers `host/gdb_debugger.py`
+(`ps5-report` on the existing GDB connection), the transport-independent
+`debugger_report.py` collector, and `debugger_analyze.py search` / `xrefs`.
+Raw stack bytes and per-range errors are retained; RBP chains are explicitly
+heuristic. Capture/search use the standard library. Cross-references require
+`requirements-debugger.txt`. Offline analysis never opens a target connection.
 
 ## Offline kernel patch toolkit
 

@@ -43,7 +43,7 @@ replacement or restoration in the current firmware/resident session.
 | Live verifier | Pin resident build/session/generation, obtain current kernel bases, verify mappings and compare original bytes immediately before mutation | Reuse concepts from [kernel inspection](KERNEL_DEBUGGER.md) and [readiness](KERNEL_READINESS.md); the existing inspection capability grants no write permission |
 | Bounded writer | Apply one planned change, verify readback, preserve the preimage and result, and attempt and verify restoration after failure | Portable transaction core and host simulation implemented; live backend still required |
 | Cooperative resident adapter | Provide explicit ownership, synchronization, bounded transport and write capability for the selected operation | Stage 2 inspection and stage 3 owned-cell source adapters implemented; selected real-data and execution adapters still required |
-| Trace and execution interface | Observe effects; eventually coordinate kernel stop, step, restoration and release | Live hardware adapters for capture and execution remain unfinished |
+| Trace and execution interface | Observe effects; eventually coordinate kernel stop, step, restoration and release | [Capture](KERNEL_CAPTURE_CORE.md) and [execution](KERNEL_EXECUTION.md) cores exist; live hardware adapters remain unfinished |
 
 ## Implementation sequence
 

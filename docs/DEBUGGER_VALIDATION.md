@@ -35,7 +35,9 @@ The isolated final source/build and captured logs remain on gpubox.
 
 ## Console evidence
 
-Console: the existing PS5 Pro 13.60 research console, address 192.168.87.247.
+Console: the PS5 Pro 13.60 research console used by these runs (address
+192.168.87.247 as of the 2026-10-18 operator report; later session status is a
+dated fact recorded in [DEBUGGER_RECOVERY.md](DEBUGGER_RECOVERY.md)).
 These tests used only disposable children created by the debugger. No system
 application or game was selected as a debug target. The console model/firmware
 labels come from the established workspace record; these runs did not capture

@@ -70,12 +70,14 @@ that artifact. Builds made before these rules, for example with Homebrew LLVM
 | `make all` | Compile both debugger/inspection tools, nine diagnostic payloads and the minimal payload |
 | `make resident-snapshot process-watch` | Compile selected payloads |
 | `make kernel-offset` | Build the kernel offset inspection payload; see [kernel backend](KERNEL_DEBUGGER.md) |
+| `make kernel-execution-check` | SDK-compile the portable [SMP coordinator](KERNEL_EXECUTION.md) into an object; no payload or installer |
 | `make kernel-patch-campaign` | Run the [44,256-case host fault experiment](KERNEL_PATCH_EXPERIMENTS.md); no SDK or console |
 | `make kernel-patch-host` | Build the offline [patch simulator](KERNEL_PATCH_TOOLKIT.md) with the host compiler; no SDK or console |
 | `make kernel-patch-check` | SDK-compile the portable patch transaction core into a freestanding object; no live adapter or installer |
 | `make kernel-patch-stage2` | SDK-build the optional read-only client; default provider-free, private credential-bearing build requires explicit configuration |
 | `make kernel-patch-resident` | Link complete private resident images and compile actual installer source from an overlay prepared with `--link-inputs`; see [private build runbook](KERNEL_PATCH_BUILD.md) |
 | `make kernel-patch-stage2-check` | SDK-compile the prepared [stage 2 overlay](KERNEL_PATCH_STAGE2.md), patched dispatch and bootstrap fixture; no linked resident or installer |
+| `make evidence-check` | SDK-build the benign checkpoint example and freestanding resident evidence object; no panic installer or device driver |
 | `make process-debugger` | Build the usermode GDB server; see [debugger runbook](DEBUGGER.md) |
 | `make process-snapshot` | Compile the one-shot process snapshot tool |
 | `make thread-probe-v1 thread-probe-v2` | Compile the raw collectors |

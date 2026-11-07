@@ -130,8 +130,9 @@ a reduction in actual console crashes.
 
 The workspace operator records show one instrumented resident per fresh session,
 an observer that logs and resumes, and reader3 exports after some black-screen
-failures. They do not establish ring fullness as the reason for rebooting. Those
-dated records separate reusable storage, snapshot waits and execution recovery. Three
+failures. They do not establish ring fullness as the reason for rebooting. The
+[capture reuse investigation](KERNEL_CAPTURE_REUSE.md) records those dated facts
+and separates reusable storage, snapshot waits and execution recovery. Three
 added host scenarios test repeated capture/restore/release cycles and demonstrate
 that empty rings do not resolve missing CPUs or failed restoration. One pinned
 resident with bounded observation windows is a proposed way to reduce resident

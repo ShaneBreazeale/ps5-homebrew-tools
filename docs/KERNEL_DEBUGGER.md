@@ -126,6 +126,11 @@ connects nor establishes present readiness. For another offset,
 
 ## Execution-control adapter still required
 
+The separate [durable evidence path](DURABLE_CHECKPOINTS.md) supplies app-side
+host acknowledgements, resident trace/panic storage and bounded polled export.
+It installs no kernel hook and supplies no physical panic transport; it cannot
+turn a kernel read capability into live panic capture or execution control.
+
 Kernel read/write access alone does not supply safe asynchronous traps or an
 SMP stop/resume mechanism. The next phase must choose and validate one trap owner:
 
@@ -145,7 +150,19 @@ reversible disarm, and a transport that does not depend on scheduling network
 code while a CPU holds a kernel stop. Full r15, rax and the safely read
 `[rbp-0x68]` are useful proposed join observations; low 32-bit r15 alone did not
 identify the prior failure. Collecting those registers is not implemented by
-this byte-inspection payload.
+this byte-inspection payload. The separate [cooperative capture core](KERNEL_CAPTURE_CORE.md)
+now supplies four-slot registration, register-event buffering and ownership
+revocation for adapter integration. It requires explicit grants for existing
+resident execution traps across the CPU scope; it does not install those traps
+or supply a live resident transport.
+
+The [SMP execution coordinator](KERNEL_EXECUTION.md) now implements a nonblocking
+stop/step/restore state machine and bounded shared-memory mailbox, exercised by
+16 concurrent simulated CPUs. A separate SDK compile check covers that core.
+Actual rendezvous entry, architecture stepping, physical polled transport and
+verified hardware restoration still require a resident adapter. Neither core
+is linked into this inspection payload, and no live kernel execution capability
+or console validation is claimed.
 
 ## LLM and validation contract
 
@@ -167,7 +184,8 @@ host checks. This backend has not been deployed or console-validated.
 
 This historical record predates the readiness-handshake change. See
 [readiness verification](KERNEL_READINESS.md#verification-boundary) for the new
-source and its separate build evidence.
+source and its separate, later same-day build evidence (which recorded **54**
+host tests).
 
 Built on gpubox in `/tmp/ps5-kernel-offset-HSfy8t` through
 `make kernel-offset process-debugger check`, with the staged public SDK and

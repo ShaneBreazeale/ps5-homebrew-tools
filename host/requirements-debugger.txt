@@ -1,0 +1,2 @@
+# Optional offline x86-64 cross-reference decoder; capture/search use stdlib.
+capstone==5.0.7

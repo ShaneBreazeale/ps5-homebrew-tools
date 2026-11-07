@@ -1,6 +1,6 @@
 # Process debugger: protocol reference
 
-This reference describes `payloads/process-debugger/main.c` and the imported
+This reference describes `payloads/process-debugger/rsp.c` and the imported
 packet transport, not the full GDB remote protocol. Use [the CLI runbook](DEBUGGER.md)
 for operations and [the agent contract](DEBUGGER_AGENTS.md) for automation.
 Implemented packets are not evidence of successful console validation.
@@ -39,10 +39,10 @@ Implemented packets are not evidence of successful console validation.
 | `?` | Current stop/exit reply | With no target can return `W00`; that alone does not prove a known process exited |
 | `D` / `D;PID` | `OK` after restoring/debug-detaching; or `Exx` | Tagged PID must match target; resumes via PT_DETACH |
 | `vKill;PID` | `OK` after killing/waiting, or `Exx` | Destructive; only current stopped target; not detach |
-| `qXfer:features:read:target.xml:OFFSET,LENGTH` | `m...` / `l...` XML chunks | Minimal x86-64 / FreeBSD target declaration |
+| `qXfer:features:read:target.xml:OFFSET,LENGTH` | `m...` / `l...` XML chunks | Explicit x86-64 / FreeBSD register-file description |
 
 `vRun`, fork/exec following, multiprocess IDs (`pPID.TID`), non-stop mode,
-`qXfer:exec-file`, library/memory maps, qRcmd/`monitor`, TLS address resolution,
+`qXfer:exec-file`, automatic library/memory-map transfers, qRcmd/`monitor`, TLS address resolution,
 remote file I/O and remote executable loading are not implemented. Unsupported
 queries generally receive an empty packet while attached; the generic target
 state gate can instead return ESRCH before attachment.
@@ -72,8 +72,10 @@ Core register layout:
 
 For example `p10` reads RIP; `p11` reads EFLAGS. Register bytes are hex-encoded
 in little-endian order, not a text-formatted numeric value. Unavailable FP/vector
-registers are `x` placeholders, not zeroes. The server does not supply FS/GS base
-registers, FP register access or a complete extended-register target XML.
+registers are `x` placeholders, not zeroes. The XML describes that existing
+wire file, including unavailable fields. Optional FS/GS and size-reported XSAVE
+inspection use the custom register-bank packets below; they do not populate
+FP/vector fields in `g` or add extended-register writes.
 
 Selecting a thread does not turn a process continue into thread-isolated
 execution. `Hc` and the optional vCont TID select/validate context; a normal
@@ -86,7 +88,7 @@ path is host-tested only.
 | Packet | Behavior |
 | --- | --- |
 | `mADDRESS,LENGTH` | Read at most 1,024 user bytes; returns hex or error |
-| `MADDRESS,LENGTH:HEX` | Write exact hex bytes while stopped; `OK` or error |
+| `MADDRESS,LENGTH:HEX` | Verified write while stopped; `OK` only after exact readback; failure restores preimage or poisons execution |
 | `c` / `cADDRESS` | Continue; optional address updates selected LWP RIP |
 | `s` / `sADDRESS` | Single instruction step; optional address updates RIP |
 | `vCont?` | `vCont;c;s` |
@@ -147,7 +149,10 @@ error, not a hidden method of enabling 13.60 watchpoints.
   or partial writes restore the previous bytes; unverifiable restoration poisons
   further memory writes, resumes and breakpoint changes. Detach refuses an
   unrestored memory transaction because detach would resume the process.
-  Otherwise, detach restores every original byte.
+  The same transaction applies to ordinary writes, breakpoint planting/removal,
+  hidden-step restore/replant and detach restoration. Ownership entries are
+  cleared only after verified restoration. These checks do not make shared
+  mappings atomic against other writers.
 - Proven hardware execution events can include `hwbreak:;`.
 - Data-watchpoint formatting exists for `watch:ADDRESS;` and `awatch:ADDRESS;`,
   but no successful retail 13.60 data-watchpoint test is claimed.
@@ -178,6 +183,86 @@ reconnecting validation client can inspect cleanup. It still needs explicit
 finish/reaping. An old server version may behave differently; identify its hash.
 None of these packets is a general command shell or kernel breakpoint interface.
 
+## Read-only discovery packets
+
+These extensions use the same RSP connection. Use `maintenance packet ...` in
+an existing GDB session; never open a second client. All numeric values below
+are hexadecimal, including IDs, sizes, indexes and timestamps. Text and opaque
+register bytes are hex-encoded to keep target names out of RSP framing. The
+existing `g`/`G` layout and its unavailable FP/vector placeholders are unchanged.
+
+| Packet | Preconditions | Reply |
+| --- | --- | --- |
+| `qPS5:capabilities` | Connected; no attachment needed | `schema:1;source:...;llvm:...;implemented:MASK;firmware:HEX;server_pid:HEX;scope:user;hosting:standalone;validation:host;max_memory:400;max_threads:100;max_maps:800;max_regset:1000;max_ranges:10;dr_slots:4` |
+| `qPS5:state` | Connected | Native state: PID, stopped/poison flags, stop serial, selected/resume/stop LWPs, stop kind/signal/exit, breakpoint kind/address |
+| `qPS5:readv:A,L;A,L` | Attached/stopped | `count:N;0:ERR,LENGTH,HEX;...`; up to 16 ranges, 1,024 total bytes; per-range errno, zero length/no bytes on failure |
+| `qPS5:process` | Attached/stopped; 13.60 profile | `pid:...;ppid:...;start_sec:...;start_usec:...;fields:MASK;app_id:...;app_type:...;name:HEX;path:HEX;title:HEX` |
+| `qPS5:maps:INDEX` | Attached/stopped; 13.60 profile | `index:...;count:...;snapshot:...;start:...;end:...;offset:...;permissions:...;truncated:...;name:HEX` for one entry |
+| `qPS5:module:HEX_BASENAME` | Attached/stopped | SDK module `handle:...;base:...;entry:...`, or error |
+| `qPS5:regset:fsgs:OFFSET,LENGTH` | Attached/stopped; getter supported | `size:10;features:0;offset:...;data:HEX` slice of two little-endian 64-bit FS/GS bases |
+| `qPS5:regset:xsave:OFFSET,LENGTH` | Attached/stopped; getters supported | `size:...;features:MASK;offset:...;data:HEX` slice of the kernel-reported XSAVE image |
+
+`source` is a deterministic SHA-256 fingerprint of debugger C/header inputs,
+packet-codec headers, build rules/generator and the reported LLVM version. It
+is generated during the standard build. It does not include arbitrary compiler
+flags, identify the final ELF bytes or prove runtime validation. Keep the exact
+ELF hash and flags in the session manifest. Test/nonstandard builds without the
+generated header report `unrecorded`. `validation:host` explicitly records that
+this extension set has no console validation. A schema change requires clients
+to recheck these field meanings.
+
+The implemented-operation mask describes code/query paths, not successful
+runtime probes or available hardware capacity:
+
+| Bit | Meaning |
+| --- | --- |
+| `1` | Verified process-memory write transactions |
+| `2` | Process metadata query (13.60 profile) |
+| `4` | Map query (13.60 profile; selector may be absent) |
+| `8` | SDK module basename lookup |
+| `10` | FS/GS-base getter requests compiled in |
+| `20` | Size-reported XSAVE getter requests compiled in |
+| `40` | Software breakpoints |
+| `80` | Hardware execution breakpoints; free capacity still required |
+| `200` | Multiple-range memory read interface |
+| `400` | Provider stop serial and state inspection |
+| `100` | Data-watchpoint code path not blocked by the known 13.60 restriction; other firmware remains unvalidated |
+
+`dr_slots:4` is architectural capacity, never a grant. Query flags can be set
+when the kernel subsequently returns ENOTSUP/EINVAL/ENOENT or denies access.
+The metadata `fields` mask uses `1` for name/parent/start, `2` for a returned
+executable path, and `4` for returned app/title metadata. Missing optional fields
+are zero/empty and have no flag. A process timestamp is console-provided lifetime
+metadata, not a verified executable hash or proof of present readiness.
+
+Maps use at most 2,048 entries and a 4 MiB sysctl buffer. Size-race retries are
+bounded to three. Incompatible records, invalid ordering/ranges/permissions and
+unterminated paths fail the whole operation. `truncated:1` marks a path shortened
+to 255 bytes. Each indexed request obtains a fresh list. `snapshot` is a
+noncryptographic FNV-1a fingerprint of the returned fields; clients collecting
+multiple entries must reject differing fingerprints/counts. It is not an atomic
+snapshot, timestamp, executable identity or proof against shared-mapping changes.
+Map `offset` is an object/file mapping offset, not a GDB symbol slide.
+
+Module requests take a nonempty printable basename of at most 255 bytes, with
+no slash. The returned SDK `base` is the module's map base; `entry` may be zero
+when the module has no entry point. Neither is automatically a valid load bias
+for an arbitrary symbol file. Match the module/ELF identity and PT_LOAD layout
+before relocating symbols. No library enumeration or remote function invocation
+is added.
+
+Register chunks have a maximum requested length of 1,024 bytes. The last chunk
+can be shorter; offset equal to size returns empty data. XSAVE lengths below
+512 or above 4,096 are rejected before requesting the image. `features` is the
+kernel-reported supported XSAVE mask; consumers must also interpret the image's
+state-present/format fields correctly. A size or feature mask alone does not
+prove observed AVX register values. FS/GS and XSAVE operations are read-only and
+have no PCB fallback. See the [FP layout explanation](DEBUGGER_OVERLAP.md#why-the-fp-sizes-differ).
+
+All new inspection paths are host-tested and SDK-built, not console-validated.
+Missing Sony sysctl/ptrace support is reported; no kernel walker, policy patch,
+ShellCore injection or automatic relocation is attempted.
+
 ## Errors and state
 
 Error packets are `E` plus two hexadecimal digits of the target/native errno.
@@ -203,9 +288,25 @@ blindly replay commands or restart the server on EIO/timeout.
 
 ## Source and external reference
 
-Implementation: [main.c](../payloads/process-debugger/main.c),
+Implementation: [RSP adapter](../payloads/process-debugger/rsp.c),
+[target operations and provider contract](DEBUGGER_BACKEND.md),
 [DR7 encoding](../payloads/process-debugger/hwbreak.h),
 [transport](../vendor/prosper0gdb/rsp_transport.h), and
 [host backend tests](../tests/test_process_debugger.py).
 External protocol: [GNU GDB RSP packets](https://sourceware.org/gdb/current/onlinedocs/gdb.html/Packets.html)
 and [stop replies](https://sourceware.org/gdb/current/onlinedocs/gdb.html/Stop-Reply-Packets.html).
+
+Saved reports use the [stop-report runbook](DEBUGGER_REPORTS.md). `qPS5:state`
+fields are `pid`, `stopped`, `stop_id`, `selected`, `resume`, `thread`, `kind`,
+`signal`, `exit`, `break`, `address`, `poisoned`, `memory_poisoned`, all hexadecimal.
+Stop kind 0/1/2 means native signal stop/normal exit/signal termination. Break kind
+0/1/2/3/4/5 means none/software/execute/write/access/read. Signals here are native
+FreeBSD values; ordinary RSP stop replies retain GDB signal translation. Stop
+serials are provider-lifetime observations, not memory snapshot transactions.
+
+The target XML now describes the existing 560-byte wire layout explicitly:
+164 available core bytes, unavailable x87/SSE fields and 24 bytes of unavailable
+legacy padding. This corrects a minimal-description/register-length mismatch
+without changing `g`/`G` bytes or claiming FP/vector availability. A GDB build
+without FreeBSD ABI support can reject the description or warn about fallback;
+use an appropriate client and retain the protocol log.

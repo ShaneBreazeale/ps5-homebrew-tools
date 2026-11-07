@@ -10,12 +10,21 @@ It is not a kernel debugger and cannot trap kernel offset `0xcfc12`.
 | --- | --- |
 | [CLI runbook](../../docs/DEBUGGER.md) | Build on gpubox, deploy once, log, attach, inspect, step, software/hardware breakpoints, detach |
 | [LLM / CLI / GDB-MI contract](../../docs/DEBUGGER_AGENTS.md) | Session facts, bounded automation, MI state handling, evidence handoff |
+| [Stop reports and analysis](../../docs/DEBUGGER_REPORTS.md) | Same-connection saved reports, bulk reads and offline wildcard/xref analysis |
+| [Target backend API](../../docs/DEBUGGER_BACKEND.md) | Target operation contract, ptrace provider, RSP adapter and discovery |
 | [Packet reference](../../docs/DEBUGGER_PROTOCOL.md) | Actual RSP subset, GP layout, identifiers, custom packets, limits and errors |
 | [Recovery and kernel scope](../../docs/DEBUGGER_RECOVERY.md) | Offline console, kstuff slot ownership, Chain Test constraints, retired PCB fallback |
 | [Validation record](../../docs/DEBUGGER_VALIDATION.md) | Exact historical builds, failed runs, successful child-only checks and remaining work |
 | [Context7 guide](../../docs/CONTEXT7.md) | Confirmed library ID, retrieval prompts, indexing rules |
 
 ## Current status
+
+Current host-tested extensions add verified memory writes on every mutation
+path, process metadata, bounded map queries, SDK module lookup, read-only
+FS/GS and XSAVE inspection, and a source/capability fingerprint. Runtime support
+for the new inspection paths has not been console-validated. See the
+[overlap review](../../docs/DEBUGGER_OVERLAP.md) and packet reference.
+
 
 Historical PS5 Pro 13.60 tests passed child-process attachment, GP register and
 memory read/write/restore, instruction stepping, and a hardware execution trap

@@ -16,6 +16,10 @@ Commands in the guides run from the repository root unless stated otherwise.
 | [Private resident builds](KERNEL_PATCH_BUILD.md) | Pin complete dependencies, link resident images and compile the actual installer source |
 | [Kernel patch stage 2](KERNEL_PATCH_STAGE2.md) | Prepare the pinned private resident overlay, build the authenticated read-only client and verify saved observations |
 | [Kernel patch stage 3](KERNEL_PATCH_STAGE3.md) | Run the authenticated owned-cell write/readback/restore exercise, resident journal and read-only recovery; live validation pending |
+| [Reusable capture windows](KERNEL_CAPTURE_REUSE.md) | Separate ring draining from the acknowledged release step and verified restoration; review the remaining live-adapter requirements |
+| [Kernel event capture core](KERNEL_CAPTURE_CORE.md) | Integrate bounded capture on up to four explicitly granted resident execution slots; no live adapter yet |
+| [SMP execution coordinator](KERNEL_EXECUTION.md) | Review stop/step/restore barriers, the polled mailbox and missing hardware adapter |
+| [Durable checkpoints and panic evidence](DURABLE_CHECKPOINTS.md) | Save app checkpoints before acknowledgement; integrate bounded resident traces and panic export |
 | [Process debugger CLI](DEBUGGER.md) | Build, log, attach by PID, inspect, step and detach |
 | [Host utilities](../host/README.md) | Send once, stream until the connection dies, classify a failed session, and summarize v2 captures |
 | [Process snapshot](../payloads/process-snapshot/README.md) | Take one filtered process snapshot |
@@ -51,7 +55,11 @@ Commands in the guides run from the repository root unless stated otherwise.
 - [CLI runbook](DEBUGGER.md): operational workflow and troubleshooting.
 - [Agent / GDB-MI guide](DEBUGGER_AGENTS.md): automation, evidence and cleanup state.
 - [Protocol reference](DEBUGGER_PROTOCOL.md): exact implemented packet subset.
+- [Stop reports and analysis](DEBUGGER_REPORTS.md): saved raw stack evidence, bulk reads, wildcard searches and cross-references.
+- [Target backend API](DEBUGGER_BACKEND.md): inspection/execution operations separated from RSP.
+- [ps5debug-NG overlap](DEBUGGER_OVERLAP.md): implemented shared concepts and attachment/FP-layout research.
 - [Recovery / kernel scope](DEBUGGER_RECOVERY.md): dated session facts and failed paths.
 - [Validation](DEBUGGER_VALIDATION.md): gpubox builds and partial console evidence.
 - [Root agent instructions](../AGENTS.md): repository-specific rules for coding agents.
 - [GDB compatibility profile](debugger/compat.gdb): local settings; makes no connection.
+

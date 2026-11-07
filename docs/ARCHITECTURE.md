@@ -26,9 +26,10 @@ inspection using their tool documentation.
 | --- | --- |
 | `payloads/` | Independently compiled console tools and their guides |
 | `host/` | Sending, session classification (ICMP only), raw capture, and offline interpretation |
+| `common/`, `lib/`, `examples/` | Fixed evidence wire encoding, durable usermode checkpoint client and benign integration example |
 | `mk/` | Shared root-build rules using the external SDK |
 | `vendor/` | Imported reader ABI declarations, ioctl definitions and GDB packet transport |
-| `residents/` | Historical profiles, marker meanings, and archived patch scripts |
+| `residents/` | Historical profiles/archives and portable readiness, capture and execution integration cores |
 | `templates/` | A small SDK project that can be copied independently |
 | `tests/` | Host transport/analysis checks, debugger protocol and ptrace-state mocks |
 | `docs/` | Setup, architecture, compatibility, and provenance |
@@ -52,9 +53,13 @@ the resident's counters, message ring, and numeric word ring. Its ABI is declare
 in [shared_area.h](../vendor/kstuff/uelf/shared_area.h); event meanings are tied
 to the producing [resident profile](../residents/README.md).
 
-There is no general logging library or universal event decoder in this initial
-collection. Keep raw output and source identities so future decoders can
-interpret the original format accurately.
+The [durable evidence path](DURABLE_CHECKPOINTS.md) adds an explicit versioned
+binary record for new app checkpoints and resident trace/panic observations.
+Its host journal persists records before checkpoint ACKs. It does not reinterpret
+legacy reader markers. Keep raw output, per-build site schemas and exact source/
+ELF identities. The resident polled exporter still needs a live panic hook and
+an independent physical driver; normal scheduling/networking is unavailable
+as a dependency during kernel failure.
 
 ## Kernel offset inspection path
 
@@ -66,16 +71,25 @@ historical resume-cookie fallback requires an explicit build option and cannot
 rescue malformed, stale or changing handshake evidence. It emits a JSON observation, performs no kernel
 writes and installs no trap. A saved observation can relocate a host report but
 cannot establish present readiness, full running-image identity or DR ownership.
-Execution control remains a separate unfinished adapter.
+The separate [SMP coordinator](KERNEL_EXECUTION.md) now models concurrent
+stop/step/restore barriers and a polled command mailbox. Its actual resident
+rendezvous, architecture stepping, physical transport and restoration adapter
+remain unimplemented; native simulation and an SDK object check do not supply
+live execution control.
 
 ## Process-debugger control path
 
 The process debugger is a long-lived control server with a second TCP channel:
 loader transport deploys the ELF and streams stdout; a single GDB client owns
 the independent RSP connection. Host send/idle status is separate from debugger
-attachment and target execution state. The payload has its own ptrace dispatcher
-and reuses the research stub's packet codec; it does not enter prosper0gdb's
-ring-0 context or install kernel traps.
+attachment and target execution state. The listener owns connection lifetime;
+the RSP adapter owns packets and register encoding; the ptrace provider owns
+inspection, execution, breakpoint state and restoration behind a
+[typed target API](DEBUGGER_BACKEND.md). Read-only discovery uses bounded
+sysctl queries and SDK dynlib helpers; optional register banks use ptrace getters.
+Controller interrupts arrive through a callback rather than backend
+socket reads. The adapter reuses the research stub's packet codec; it does not
+enter prosper0gdb's ring-0 context or install kernel traps.
 
 SDK helpers temporarily change caller credentials around raw ptrace/signal
 syscalls and restore them afterward. Debug registers are allocated only from

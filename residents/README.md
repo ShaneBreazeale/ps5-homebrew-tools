@@ -13,6 +13,21 @@ client. Source preparation leaves the existing checkout untouched. The actual
 dispatch/bridge and bootstrap helper are SDK-compile-checked; no full resident
 installer or console validation is supplied. Write capabilities remain disabled.
 
+The [resident evidence core](../docs/DURABLE_CHECKPOINTS.md) under `evidence/`
+adds preallocated per-CPU traces, separate panic slots and bounded polled export.
+It is host-tested and SDK-compile-checked. A live panic hook and independent
+physical output driver remain integration work. The app checkpoint library is
+usermode-only and must not run in these exception paths.
+
+The [cooperative capture core](../docs/KERNEL_CAPTURE_CORE.md) is a separate,
+host-tested integration component under `capture/`. It records events from up
+to four explicitly granted resident execution slots and installs no traps.
+The historical variants below do not implement its adapter automatically.
+
+The [SMP execution coordinator](../docs/KERNEL_EXECUTION.md) under `execution/`
+adds a nonblocking stop/step/restore protocol and a fixed polled mailbox. It is
+host-simulated and SDK-compile-checked, with no installed hardware adapter.
+
 These names identify experimental kstuff resident variants used during PS5 Pro
 13.60 research. They are not independently loadable diagnostic tools or validated
 launch fixes. None is built by the root Makefile.

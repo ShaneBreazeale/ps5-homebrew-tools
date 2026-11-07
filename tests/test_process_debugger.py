@@ -17,11 +17,17 @@ MOCK = r'''
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+int process_describe(uint64_t pid, struct target_process_info* out) { return -ENOTSUP; }
+int process_maps(uint64_t pid, struct target_map* out, size_t capacity, size_t* count) { *count=0; return -ENOTSUP; }
+int process_module(uint64_t pid, const char* name, struct target_module* out) { return -ENOTSUP; }
 static struct reg mock_regs[2];
 static struct dbreg mock_db[2];
 static unsigned char mock_memory[1024];
 static int pending, attached, fail_set, corrupt_set, sets, stepped[2], suspended[2];
-static int writes, fail_write, short_write, corrupt_write, partial_error;
+static int stall_continue, signals_sent;
+static int writes, fail_write, short_write, corrupt_write, partial_error, drop_write;
+static int reads, fail_read, regbank_error, xsave_reads;
+static uint32_t xsave_length;
 static int event_lwp, event_code, continues, step_signal, step_code, step_stop_lwp, step_exit, step_no_siginfo;
 static int mock_ptrace(int request, int id, caddr_t address, int data) {
     int i = id == 102 ? 1 : 0;
@@ -46,6 +52,18 @@ static int mock_ptrace(int request, int id, caddr_t address, int data) {
         info->pl_siginfo.si_code = event_code;
         return 0;
     }
+    case PT_GETFSBASE: case PT_GETGSBASE:
+        if(regbank_error) { errno=regbank_error; return -1; }
+        *(uint64_t*)address = request == PT_GETFSBASE ? 0x123456789ull : 0xabcdef123ull;
+        return 0;
+    case PT_GETXSTATE_INFO:
+        if(regbank_error) { errno=regbank_error; return -1; }
+        assert(data == sizeof(struct ptrace_xstate_info));
+        *(struct ptrace_xstate_info*)address = (struct ptrace_xstate_info){7, xsave_length}; return 0;
+    case PT_GETXSTATE:
+        xsave_reads++;
+        assert(data == xsave_length && xsave_length <= TARGET_MAX_REGISTER_DATA);
+        memset(address, 0xa5, xsave_length); return 0;
     case PT_GETREGS: *(struct reg*)address = mock_regs[i]; return 0;
     case PT_SETREGS: mock_regs[i] = *(struct reg*)address; return 0;
     case PT_CLEARSTEP: stepped[i] = 0; return 0;
@@ -54,6 +72,7 @@ static int mock_ptrace(int request, int id, caddr_t address, int data) {
     case PT_RESUME: suspended[i] = 0; return 0;
     case PT_CONTINUE: {
         continues++;
+        if(stall_continue) { pending = 0; return 0; }
         int active = stepped[1] ? 1 : 0;
         unsigned long rip = mock_regs[active].r_rip;
         mock_db[active].dr[6] = 0;
@@ -79,9 +98,13 @@ static int mock_ptrace(int request, int id, caddr_t address, int data) {
         struct ptrace_io_desc* io = (void*)address;
         uintptr_t offset = (uintptr_t)io->piod_offs;
         if(offset > sizeof(mock_memory) || io->piod_len > sizeof(mock_memory)-offset) { errno = EFAULT; return -1; }
-        if(io->piod_op == PIOD_READ_D) __builtin_memcpy(io->piod_addr, mock_memory+offset, io->piod_len);
+        if(io->piod_op == PIOD_READ_D) {
+            if(++reads == fail_read) { errno=EFAULT; return -1; }
+            __builtin_memcpy(io->piod_addr, mock_memory+offset, io->piod_len);
+        }
         else {
             writes++;
+            if(writes == drop_write) return 0;
             if(writes == fail_write) { errno = EFAULT; return -1; }
             if(writes == short_write || writes == partial_error) io->piod_len = 1;
             __builtin_memcpy(mock_memory+offset, io->piod_addr, io->piod_len);
@@ -99,6 +122,10 @@ static pid_t mock_wait4(pid_t pid, int* status, int flags, struct rusage* usage)
     pending = 0;
     return pid;
 }
+static int mock_kill(pid_t pid, int sig) {
+    assert(pid == 4242 && sig == SIGSTOP);
+    signals_sent++; pending = SIGSTOP; return 0;
+}
 static void setup(void) {
     __builtin_memset(&target, 0, sizeof(target));
     __builtin_memset(mock_regs, 0, sizeof(mock_regs));
@@ -113,6 +140,8 @@ static void setup(void) {
     writes = fail_write = short_write = corrupt_write = partial_error = continues = 0;
     step_signal = step_code = step_stop_lwp = step_exit = step_no_siginfo = 0;
     event_lwp = 101; event_code = 0;
+    stall_continue = signals_sent = drop_write = reads = fail_read = regbank_error = xsave_reads = 0;
+    xsave_length = 832;
     __builtin_memset(stepped, 0, sizeof(stepped));
     __builtin_memset(suspended, 0, sizeof(suspended));
 }
@@ -138,7 +167,7 @@ static void software_write_tests(void) {
         assert(mock_memory[0x20] == 0xcc);
         assert(target.poisoned == (mode == 4));
         if(mode == 4) {
-            assert(resume_process(0, 0, 0) == -EIO);
+            assert(resume_process(0, 0, 0, NULL) == -EIO);
             assert(breakpoint(0, 0, 0x20, 1) == -EIO);
             assert(memory_io(PIOD_WRITE_D, 0x20, data, 1) == -EIO);
             assert(detach_process() == -EIO && attached && target.stopped);
@@ -170,7 +199,7 @@ static void software_step_tests(void) {
         mock_memory[0x20] = 0x90;
         assert(breakpoint(1, 0, 0x20, 1) == 0);
         mock_regs[0].r_rip = 0x20;
-        assert(resume_process(0, 0, 0) == 0 && target.sw_hit == 0);
+        assert(resume_process(0, 0, 0, NULL) == 0 && target.sw_hit == 0);
         int before = continues;
         /* Both Hc and Hg may select a different LWP after the hit. The hidden
          * step must execute the LWP whose RIP was rewound. */
@@ -183,7 +212,7 @@ static void software_step_tests(void) {
         if(mode == 6) mock_regs[0].r_rip = 0x30; /* client changed RIP */
         if(mode == 8) step_no_siginfo = 1;
         if(mode == 9) assert(breakpoint(1, 1, 0x99, 1) == 0);
-        int result = resume_process(mode == 7, mode == 7 ? 102 : 0, 0);
+        int result = resume_process(mode == 7, mode == 7 ? 102 : 0, 0, NULL);
         if(mode == 4) {
             assert(result == 1 && !target.pid && !target.poisoned);
             assert(continues == before+1);
@@ -248,7 +277,7 @@ static void unit_tests(void) {
     assert(breakpoint(1, 1, 0x4000, 1) == -ENOSPC);
     assert(breakpoint(1, 2, 0x2001, 8) == -EINVAL);
     assert(breakpoint(1, 3, 0x2000, 8) == 1);
-    assert(resume_process(1, 101, 0) == 0);
+    assert(resume_process(1, 101, 0, NULL) == 0);
     assert(!stepped[0] && !suspended[1]);
     assert(detach_process() == 0 && !attached);
     for(int i = 0; i < 2; i++) {
@@ -276,13 +305,171 @@ static void unit_tests(void) {
     assert(detach_process() == 0);
     puts("backend state/readback/ownership/rollback assertions passed");
 }
+
+
+static void all_write_tests(void) {
+    /* Every path must roll back dropped/sanitized writes, and retain ownership
+     * if restoration fails. No fault mode may report success or detach. */
+    for(int path=0; path<6; path++) for(int fatal=0; fatal<2; fatal++) {
+        setup(); assert(attach_process(4242)==0);
+        mock_memory[0x20]=0x90;
+        if(path>=2) assert(breakpoint(1,0,0x20,1)==0);
+        if(path>=4) {
+            mock_regs[0].r_rip=0x20;
+            assert(resume_process(0,0,0,NULL)==0 && target.sw_hit==0);
+        }
+        int write_index=writes+1+(path==5); /* replant follows restore */
+        corrupt_write=write_index;
+        if(fatal) fail_write=write_index+1;
+        int r;
+        if(path==0) { unsigned char data[3]={1,2,3}; r=memory_io(PIOD_WRITE_D,0x20,data,3); }
+        else if(path==1) r=breakpoint(1,0,0x20,1);
+        else if(path==2) r=breakpoint(0,0,0x20,1);
+        else if(path==3) r=detach_process();
+        else r=resume_process(0,0,0,NULL);
+        assert(r<0 && attached && target.stopped);
+        assert(target.memory_poisoned==fatal);
+        if(fatal) {
+            assert(target.poisoned && detach_process()==-EIO);
+            assert(resume_process(0,0,0,NULL)==-EIO);
+            unsigned char data=0; assert(memory_io(PIOD_WRITE_D,0x30,&data,1)==-EIO);
+        } else {
+            assert(mock_memory[0x20] == (path>=2 && path!=5 ? 0xcc : 0x90));
+            assert(detach_process()==0 && mock_memory[0x20]==0x90);
+        }
+    }
+    for(int mode=0; mode<5; mode++) {
+        setup(); assert(attach_process(4242)==0);
+        memset(mock_memory+0x20,0x90,3);
+        unsigned char bytes[3]={1,2,3};
+        if(mode==0) short_write=writes+1;
+        if(mode==1) partial_error=writes+1;
+        if(mode==2) drop_write=writes+1;
+        if(mode==3) fail_read=reads+1; /* No write after failed preimage read. */
+        if(mode==4) fail_read=reads+2; /* Readback failure requires rollback. */
+        int before=writes;
+        assert(memory_io(PIOD_WRITE_D,0x20,bytes,3)<0 && !target.memory_poisoned);
+        assert(mock_memory[0x20]==0x90 && mock_memory[0x21]==0x90 && mock_memory[0x22]==0x90);
+        if(mode==3) assert(writes==before);
+        assert(detach_process()==0);
+    }
+    puts("ordinary writes, planting, removal, detach, step restore/replant fault assertions passed");
+}
+static void register_bank_tests(void) {
+    setup(); struct debug_target* t=process_debug_target();
+    struct target_register_data out;
+    struct target_capabilities caps;
+    assert(t->ops->capabilities(t->ctx,&caps)==0);
+    assert((caps.implemented & (TARGET_CAP_VERIFIED_WRITES|TARGET_CAP_FS_GS_QUERY|TARGET_CAP_XSAVE_QUERY)) ==
+        (TARGET_CAP_VERIFIED_WRITES|TARGET_CAP_FS_GS_QUERY|TARGET_CAP_XSAVE_QUERY));
+    assert(!(caps.implemented & TARGET_CAP_DATA_WATCH));
+    assert(t->ops->read_register_bank(t->ctx,101,TARGET_REG_XSAVE,&out)==-ESRCH);
+    assert(t->ops->attach(t->ctx,4242)==0);
+    assert(t->ops->read_register_bank(t->ctx,999,TARGET_REG_XSAVE,&out)==-ESRCH);
+    assert(t->ops->read_register_bank(t->ctx,101,TARGET_REG_FS_GS_BASE,&out)==0 && out.length==16);
+    uint64_t bases[2]; memcpy(bases,out.bytes,16);
+    assert(bases[0]==0x123456789ull && bases[1]==0xabcdef123ull);
+    assert(t->ops->read_register_bank(t->ctx,101,TARGET_REG_XSAVE,&out)==0 && out.length==832 && out.features==7);
+    assert(out.bytes[0]==0xa5 && out.bytes[831]==0xa5 && out.bytes[832]==0);
+    xsave_length=TARGET_MAX_REGISTER_DATA+1;
+    assert(t->ops->read_register_bank(t->ctx,101,TARGET_REG_XSAVE,&out)==-E2BIG && xsave_reads==1);
+    xsave_length=511;
+    assert(t->ops->read_register_bank(t->ctx,101,TARGET_REG_XSAVE,&out)==-EPROTO && xsave_reads==1);
+    regbank_error=ENOTSUP;
+    assert(t->ops->read_register_bank(t->ctx,101,TARGET_REG_XSAVE,&out)==-ENOTSUP && !out.length);
+    assert(t->ops->read_register_bank(t->ctx,101,TARGET_REG_FS_GS_BASE,&out)==-ENOTSUP && !out.length);
+    assert(t->ops->detach(t->ctx)==0);
+    puts("optional read-only register banks and size/refusal assertions passed");
+}
+
+static int controller_poll(void* ctx) { return *(int*)ctx; }
+static void api_tests(void) {
+    setup();
+    struct debug_target* t = process_debug_target();
+    const struct target_ops* o = t->ops;
+    struct target_identity id;
+    struct target_state state;
+    struct target_registers regs;
+    struct target_debug_registers db;
+    uint64_t threads[2]; size_t count = 999;
+    assert(o->identity(t->ctx, &id) == 0 && id.pid == 0 && id.scope == TARGET_USER_PROCESS);
+    assert(o->maps(t->ctx, NULL, 0, &count) == -ESRCH && count == 0);
+    assert(o->read_registers(t->ctx, 101, &regs) == -ESRCH);
+    assert(o->attach(t->ctx, 4242) == 0);
+    assert(o->identity(t->ctx, &id) == 0 && id.pid == 4242);
+    assert(o->state(t->ctx, &state) == 0 && state.stopped && state.stop.signal == SIGSTOP);
+    assert(o->threads(t->ctx, threads, 1, &count) == -ENOSPC && count == 0);
+    assert(o->threads(t->ctx, threads, 2, &count) == 0 && count == 2);
+    assert(threads[0] == 101 && threads[1] == 102);
+    assert(o->select_thread(t->ctx, TARGET_REGISTER_THREAD, 102) == 0);
+    assert(o->select_thread(t->ctx, TARGET_RESUME_THREAD, 101) == 0);
+    assert(o->state(t->ctx, &state) == 0 && state.selected_thread == 102 && state.resume_thread == 101);
+    assert(o->select_thread(t->ctx, TARGET_REGISTER_THREAD, 103) == -ESRCH);
+    assert(o->select_thread(t->ctx, TARGET_REGISTER_THREAD, 0) == 0);
+    assert(o->select_thread(t->ctx, TARGET_RESUME_THREAD, 0) == 0);
+    mock_regs[1].r_trapno = 0xabc; mock_regs[1].r_err = 0xdef;
+    assert(o->read_registers(t->ctx, 102, &regs) == 0 && regs.rflags == 0x202);
+    regs.rax = 0x8877665544332211ull; regs.rip = 0x3456; regs.rflags = 0x100000202ull;
+    assert(o->write_registers(t->ctx, 102, &regs) == 0);
+    memset(&regs, 0, sizeof(regs));
+    assert(o->read_registers(t->ctx, 102, &regs) == 0 && regs.rax == 0x8877665544332211ull);
+    assert(regs.rip == 0x3456 && regs.rflags == 0x100000202ull);
+    assert(mock_regs[1].r_trapno == 0xabc && mock_regs[1].r_err == 0xdef);
+    assert(o->read_debug_registers(t->ctx, 102, &db) == 0 && db.address[1] == 0x9000 && db.control == 4);
+    unsigned char byte = 0x90, readback = 0;
+    assert(o->write_memory(t->ctx, 0x20, &byte, 1) == 0);
+    assert(o->breakpoint(t->ctx, 1, TARGET_BREAK_SOFTWARE, 0x20, 1) == 0 && mock_memory[0x20] == 0xcc);
+    assert(o->read_memory(t->ctx, 0x20, &readback, 1) == 0 && readback == 0x90);
+    struct target_memory_range ranges[] = {{0x20,1},{1024,1},{0x20,1}};
+    struct target_memory_result results[3]; unsigned char bytes[3];
+    assert(o->read_memory_ranges(t->ctx,ranges,3,bytes,sizeof(bytes),results)==0);
+    assert(bytes[0]==0x90 && bytes[1]==0 && bytes[2]==0x90 && results[1].error==-EFAULT);
+    assert(results[0].length==1 && results[1].length==0 && results[2].offset==2);
+    assert(o->breakpoint(t->ctx, 0, TARGET_BREAK_SOFTWARE, 0x20, 1) == 0 && mock_memory[0x20] == 0x90);
+    assert(o->breakpoint(t->ctx, 1, TARGET_BREAK_READ, 0x100, 8) == -ENOSYS);
+    assert(o->lease_test_hardware(t->ctx) == -EPERM);
+    assert(o->state(t->ctx, &state) == 0 && state.stop_id);
+    uint64_t first_stop = state.stop_id;
+    assert(o->resume(t->ctx, TARGET_STEP, 102, 0, NULL) == 0);
+    assert(o->state(t->ctx, &state) == 0 && state.stop_id > first_stop);
+    assert(o->state(t->ctx, &state) == 0 && state.stopped && state.stop.thread == 102);
+    assert(o->detach(t->ctx) == 0);
+    assert(o->identity(t->ctx, &id) == 0 && id.pid == 0);
+    puts("public target API assertions passed without a wire protocol");
+}
+static void callback_tests(void) {
+    for(int disconnect = 0; disconnect < 2; disconnect++) {
+        setup();
+        struct debug_target* t = process_debug_target();
+        assert(t->ops->attach(t->ctx, 4242) == 0);
+        stall_continue = 1;
+        int request = disconnect ? -ECONNRESET : 1;
+        struct target_wait wait = {controller_poll, &request};
+        int r = t->ops->resume(t->ctx, TARGET_CONTINUE, 0, 0, &wait);
+        struct target_state state;
+        assert(t->ops->state(t->ctx, &state) == 0);
+        if(disconnect) assert(r == -ECONNRESET && !state.stopped && signals_sent == 0);
+        else assert(r == 0 && state.stopped && state.stop.signal == SIGSTOP && signals_sent == 1);
+        assert(t->ops->detach(t->ctx) == 0);
+        assert(signals_sent == 1);
+    }
+    puts("controller interrupt/disconnect callback assertions passed without sockets");
+}
+
 int main(int argc, char** argv) {
     if(argc == 1) { unit_tests(); return 0; }
+    if(!strcmp(argv[1], "all-writes")) { all_write_tests(); return 0; }
+    if(!strcmp(argv[1], "regbanks")) { register_bank_tests(); return 0; }
+    if(!strcmp(argv[1], "api-tests")) { api_tests(); return 0; }
+    if(!strcmp(argv[1], "callback-tests")) { callback_tests(); return 0; }
     if(!strcmp(argv[1], "write-tests")) { software_write_tests(); return 0; }
     if(!strcmp(argv[1], "step-tests")) { software_step_tests(); return 0; }
     setup();
-    gdb_socket = atoi(argv[1]);
-    serve();
+#ifndef PROCESS_BACKEND_ONLY
+    rsp_serve(process_debug_target(), atoi(argv[1]), -1);
+#else
+    assert(!"unexpected backend-only mode");
+#endif
     if(target.pid) assert(detach_process() == 0);
     return 0;
 }
@@ -322,21 +509,30 @@ class ProcessTests(unittest.TestCase):
         # Old FreeBSD siginfo uses a tag unavailable on macOS; the mock only
         # accesses pl_lwpid, while production uses the full repository header.
         fake = fake.replace("struct __siginfo pl_siginfo", "siginfo_t pl_siginfo")
+        # SDK-declared machine request IDs; the production SDK build checks
+        # these against its actual headers. No PCB or raw-FPU fallback is used.
+        fake += "\n#define PT_GETXSTATE_INFO (PT_FIRSTMACH+4)\n#define PT_GETXSTATE (PT_FIRSTMACH+5)\n#define PT_GETFSBASE (PT_FIRSTMACH+7)\n#define PT_GETGSBASE (PT_FIRSTMACH+9)\nstruct ptrace_xstate_info { uint64_t xsave_mask; uint32_t xsave_len; };\n"
         (folder / "ptrace.h").write_text(fake)
-        process = (PAYLOAD / "main.c").read_text()
-        process = process.replace('#include "../../vendor/prosper0gdb/rsp_transport.h"', '#include "rsp_transport.h"')
-        process = process.replace('#include "../../vendor/prosper0gdb/trap_state.h"', '#include "trap_state.h"')
-        process = process.replace("#include <sys/ptrace.h>", '#include "ptrace.h"')
-        # Forward declare the doubles after native wait headers, then redirect
-        # just the implementation calls to them.
-        process = process.replace('#include "hwbreak.h"', '''#include "hwbreak.h"
-static int mock_ptrace(int, int, caddr_t, int);
-static pid_t mock_wait4(pid_t, int*, int, struct rusage*);''')
-        process = process.replace("ptrace(request, id, address, data)", "mock_ptrace(request, id, address, data)")
-        process = process.replace("wait4(", "mock_wait4(").replace("mock_mock_wait4(", "mock_wait4(")
-        process = process.replace("sys_exit", "_exit")
+        backend = (PAYLOAD / "ptrace_backend.c").read_text()
+        backend = backend.replace("#include <sys/ptrace.h>", '#include "ptrace.h"')
+        backend = backend.replace('#include "hwbreak.h"', '\n'.join([
+            '#include "hwbreak.h"',
+            'static int mock_ptrace(int, int, caddr_t, int);',
+            'static pid_t mock_wait4(pid_t, int*, int, struct rusage*);',
+            'static int mock_kill(pid_t, int);']))
+        backend = backend.replace("ptrace(request, id, address, data)", "mock_ptrace(request, id, address, data)")
+        backend = backend.replace("wait4(", "mock_wait4(").replace("mock_mock_wait4(", "mock_wait4(")
+        backend = backend.replace("return kill(pid, sig);", "return mock_kill(pid, sig);")
+        rsp = (PAYLOAD / "rsp.c").read_text()
+        rsp = rsp.replace('#include "../../vendor/prosper0gdb/rsp_transport.h"', '#include "rsp_transport.h"')
+        rsp = rsp.replace('#include "../../vendor/prosper0gdb/trap_state.h"', '#include "trap_state.h"')
         src = folder / "process.c"
-        src.write_text("#define PROCESS_DEBUGGER_TEST\n" + process + MOCK)
+        src.write_text("#define PROCESS_DEBUGGER_TEST\n" + backend + rsp + MOCK)
+        backend_src = folder / "backend-only.c"
+        backend_src.write_text("#define PROCESS_DEBUGGER_TEST\n#define PROCESS_BACKEND_ONLY\n" + backend + MOCK)
+        cls.backend_source = backend_src
+        cls.backend_exe = str(folder / "backend-only")
+        subprocess.run(["cc", "-D_GNU_SOURCE", "-w", "-I", str(PAYLOAD), str(backend_src), "-o", cls.backend_exe], check=True)
         cls.source = src
         cls.exe = str(folder / "process")
         subprocess.run(["cc", "-D_GNU_SOURCE", "-w", "-I", str(PAYLOAD), "-I", str(ROOT / "vendor/prosper0gdb"), str(src), "-o", cls.exe], check=True)
@@ -367,6 +563,18 @@ static pid_t mock_wait4(pid_t, int*, int, struct rusage*);''')
 
     def attach(self):
         self.assertTrue(self.request("vAttach;1092").startswith(b"T"))
+
+    def test_all_memory_mutation_paths_are_verified(self):
+        subprocess.run([self.backend_exe, "all-writes"], check=True)
+
+    def test_optional_register_inspection_banks(self):
+        subprocess.run([self.backend_exe, "regbanks"], check=True)
+
+    def test_target_api_without_wire_protocol(self):
+        subprocess.run([self.backend_exe, "api-tests"], check=True)
+
+    def test_target_wait_without_transport(self):
+        subprocess.run([self.backend_exe, "callback-tests"], check=True)
 
     def test_software_write_failure_transactions(self):
         subprocess.run([self.exe, "write-tests"], check=True)

@@ -5,7 +5,7 @@ CONTAINER ?= docker
 CONTAINER_IMAGE ?= ps5-homebrew-tools-build
 TOOLS := kernel-offset process-debugger resident-snapshot process-watch process-snapshot thread-probe-v1 thread-probe-v2 thread-probe-v3 follower-live kernel-capture capture-export minimal-payload
 
-.PHONY: help all checksums container-build check check-python check-paging kernel-patch-check kernel-patch-host kernel-patch-stage2 kernel-patch-stage2-check kernel-patch-stage3 kernel-patch-stage3-query kernel-patch-stage3-check native-check native-app clean bundle reader3 procwatch shellshot $(TOOLS)
+.PHONY: help all checksums container-build check check-python check-debugger-analysis check-paging kernel-execution-check kernel-patch-check kernel-patch-host kernel-patch-stage2 kernel-patch-stage2-check kernel-patch-stage3 kernel-patch-stage3-query kernel-patch-stage3-check evidence-check native-check native-app clean bundle reader3 procwatch shellshot $(TOOLS)
 
 help:
 	@echo 'PS5 Homebrew Tools'
@@ -16,6 +16,8 @@ help:
 	@echo '  make checksums           Write out/SHA256SUMS for built payloads'
 	@echo '  make native-app          Build the native starter app folder and ZIP'
 	@echo '  make check               Run host tests (no SDK or console required)'
+	@echo '  make check-debugger-analysis  Require the pinned optional decoder and test analysis'
+	@echo '  make kernel-execution-check  SDK-compile the portable SMP core (object only)'
 	@echo '  make kernel-patch-host   Build the offline patch transaction simulator'
 	@echo '  make kernel-patch-check  SDK-compile the patch core (object only)'
 	@echo '  make kernel-patch-stage2  SDK-build the read-only stage 2 client (provider-free default)'
@@ -25,6 +27,7 @@ help:
 	@echo '  make kernel-patch-stage3-check  Compile a prepared private stage 3 overlay'
 	@echo '  make kernel-patch-resident  Link a private resident and compile its actual installer'
 	@echo '  make kernel-patch-campaign  Run the host-only transfer-fault experiment'
+	@echo '  make evidence-check      SDK-compile checkpoint example and resident evidence core'
 	@echo '  make native-check        Rebuild the native runtime and verify pinned checksums (no SDK)'
 	@echo '  make clean               Remove generated payloads'
 	@echo 'Historical names: make reader3, procwatch, shellshot copy the renamed tools.'
@@ -35,6 +38,9 @@ all:
 
 $(TOOLS):
 	$(MAKE) -f mk/payloads.mk out/$@.elf
+
+kernel-execution-check:
+	$(MAKE) -f mk/payloads.mk out/kernel-execution-core-check.o
 
 kernel-patch-check:
 	$(MAKE) -f mk/payloads.mk out/kernel-patch-core-check.o
@@ -74,6 +80,9 @@ out/host/kernel-patch-sim: tooling/kernel_patch_sim.c tooling/kernel_patch_sim.h
 	mkdir -p $(@D)
 	$(HOST_CC) -std=c11 -O2 -g -Wall -Wextra -Werror -o $@ $<
 
+evidence-check:
+	$(MAKE) -f mk/payloads.mk out/checkpoint-demo.elf out/resident-evidence-core-check.o
+
 reader3: resident-snapshot
 	cp out/resident-snapshot.elf out/reader3.elf
 procwatch: process-watch
@@ -101,6 +110,10 @@ native-app:
 	$(PYTHON) tooling/native/build.py
 
 check: check-python check-paging
+
+check-debugger-analysis:
+	$(PYTHON) -c 'import capstone; assert capstone.__version__ == "5.0.7", "install host/requirements-debugger.txt"'
+	$(PYTHON) -m unittest discover -s tests -p test_debugger_tools.py -v
 
 check-python:
 	$(PYTHON) -m unittest discover -s tests -v

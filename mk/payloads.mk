@@ -61,6 +61,10 @@ all: $(addprefix out/,$(addsuffix .elf,$(TOOLS))) out/minimal-payload.elf
 out:
 	mkdir -p $@
 
+# Explicit compile-only check. This object is not a payload or live adapter.
+out/kernel-execution-core-check.o: tests/compile_kernel_execution.c residents/execution/control.h residents/execution/mailbox.h residents/capture/capture.h | out
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) -c -o $@ $<
+
 out/kernel-patch-core-check.o: tests/compile_kernel_patch.c residents/patch/patch.h residents/patch/probe.h | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) -ffreestanding -fno-builtin -mno-red-zone -mgeneral-regs-only -c -o $@ $<
 
@@ -92,6 +96,13 @@ out/kernel-patch-stage2-resident-check.o out/kernel-patch-stage2-dispatch-check.
 	$(error Set KERNEL_PATCH_STAGE2_OVERLAY to a freshly prepared private overlay)
 endif
 
+out/resident-evidence-core-check.o: tests/compile_resident_evidence.c residents/evidence/evidence.h common/evidence.h | out
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) -ffreestanding -fno-builtin -mno-red-zone -mgeneral-regs-only -c -o $@ $<
+
+out/checkpoint-demo.elf: examples/checkpoint-demo/main.c lib/checkpoint/checkpoint.c lib/checkpoint/checkpoint.h common/evidence.h | out
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(LDFLAGS) -o $@ examples/checkpoint-demo/main.c lib/checkpoint/checkpoint.c $(LDLIBS)
+	$(link_cleanup)
+
 out/resident-snapshot.elf: payloads/resident-snapshot/main.c vendor/kstuff/uelf/shared_area.h vendor/kstuff/uelf/fself.h vendor/kstuff/uelf/syscall_fixes.h vendor/freebsd/sys/ioccom.h | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) -Ivendor -Ivendor/kstuff $(LDFLAGS) -o $@ $< $(LDLIBS)
 	$(link_cleanup)
@@ -110,8 +121,13 @@ out/minimal-payload.elf: templates/minimal-payload/main.c | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
 	$(link_cleanup)
 
-out/process-debugger.elf: payloads/process-debugger/main.c payloads/process-debugger/hwbreak.h vendor/prosper0gdb/rsp_transport.h vendor/prosper0gdb/trap_state.h | out
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
+PROCESS_DEBUGGER_SOURCES := payloads/process-debugger/main.c payloads/process-debugger/ptrace_backend.c payloads/process-debugger/rsp.c payloads/process-debugger/inspection.c
+.PHONY: FORCE_PROCESS_DEBUGGER_ID
+out/process-debugger-build.h: FORCE_PROCESS_DEBUGGER_ID | out
+	python3 tooling/debugger_build_id.py --llvm-version $(LLVM_VERSION) --output $@
+
+out/process-debugger.elf: out/process-debugger-build.h payloads/process-debugger/target_description.h payloads/process-debugger/target_memory.h payloads/process-debugger/inspection.h $(PROCESS_DEBUGGER_SOURCES) payloads/process-debugger/target.h payloads/process-debugger/ptrace_backend.h payloads/process-debugger/rsp.h payloads/process-debugger/hwbreak.h vendor/prosper0gdb/rsp_transport.h vendor/prosper0gdb/trap_state.h | out
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(LDFLAGS) -include out/process-debugger-build.h -o $@ $(PROCESS_DEBUGGER_SOURCES) $(LDLIBS)
 	$(link_cleanup)
 
 # Provider source is explicitly chosen by the operator/integrator. Empty means

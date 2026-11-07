@@ -3,7 +3,7 @@ PYTHON ?= python3
 HOST_CC ?= cc
 CONTAINER ?= docker
 CONTAINER_IMAGE ?= ps5-homebrew-tools-build
-TOOLS := kernel-offset process-debugger resident-snapshot process-watch process-snapshot thread-probe-v1 thread-probe-v2 thread-probe-v3 follower-live kernel-capture capture-export minimal-payload
+TOOLS := kernel-offset process-debugger resident-snapshot process-watch process-snapshot thread-probe-v1 thread-probe-v2 thread-probe-v3 follower-live kernel-capture capture-export dev-control minimal-payload
 
 .PHONY: help all checksums container-build check check-python check-debugger-analysis check-paging kernel-execution-check kernel-patch-check kernel-patch-host kernel-patch-stage2 kernel-patch-stage2-check kernel-patch-stage3 kernel-patch-stage3-query kernel-patch-stage3-check evidence-check native-check native-app clean bundle reader3 procwatch shellshot $(TOOLS)
 
@@ -11,6 +11,7 @@ help:
 	@echo 'PS5 Homebrew Tools'
 	@echo '  make all                 Build every payload into out/'
 	@echo '  make process-watch       Build a selected tool'
+	@echo '  make dev-control         Build the development-control payload'
 	@echo '  make bundle              Build and package tools with source/checksums'
 	@echo '  make container-build     Build all payloads with the pinned reference toolchain'
 	@echo '  make checksums           Write out/SHA256SUMS for built payloads'

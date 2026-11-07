@@ -130,6 +130,26 @@ and `thread-probe-v3`. It refuses to overwrite `--log`. A failed connect
 does not retry and does not classify the session; use `send_payload.py`
 when you need the session-health sidecar.
 
+## Development control
+
+`dev_ctl.py` talks to the [dev-control](../payloads/dev-control/README.md) listener
+on TCP 9098. `--host` and `--token` are required. The token is the 64
+lowercase hex characters from that boot's ready line. `--port` defaults to
+9098 and `--timeout` defaults to 30 seconds for the whole exchange, including
+DNS. Text commands succeed when the last non-empty line starts with `OK:`.
+
+```sh
+python3 host/dev_ctl.py --host "$PS5_HOST" --token "$DEV_CTL_TOKEN" ping
+python3 host/dev_ctl.py --host "$PS5_HOST" --token "$DEV_CTL_TOKEN" list
+python3 host/dev_ctl.py --host "$PS5_HOST" --token "$DEV_CTL_TOKEN" kill ACTIVE
+python3 host/dev_ctl.py --host "$PS5_HOST" --token "$DEV_CTL_TOKEN" shot -o capture.jpg
+```
+
+`shot` rejects a declared size outside 1 byte through 64 MiB before it reads
+the body. It creates the output with `O_CREAT|O_EXCL|O_WRONLY` and refuses a
+path that already exists, including a symlink. The default name is
+`capture.png` or `capture.jpg`.
+
 ## Other host tools
 
 - [Durable checkpoints](../docs/DURABLE_CHECKPOINTS.md): `checkpoints.py listen` saves each app record before ACK; `ingest` saves raw resident trace/panic streams; `summary` rechecks evidence and identifies pending calls. No console deployment or physical panic driver.

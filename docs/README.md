@@ -29,6 +29,7 @@ Commands in the guides run from the repository root unless stated otherwise.
 | [Thread probe v2](../payloads/thread-probe-v2/README.md) | Capture selected processes' kernel thread records |
 | [Thread probe v3](../payloads/thread-probe-v3/README.md) | Walk one title's kernel threads until the process leaves |
 | [Follower-live](../payloads/follower-live/README.md) | Stream new resident ring words and first-seen ioctl commands |
+| [Dev control](../payloads/dev-control/README.md) | Authenticated process list, app stop, and existing-screenshot copy on TCP 9098 |
 | [Kernel capture and export](CAPTURE_TOOLS.md) | Collect and transfer a matching kernel-text capture |
 | [Log tools](LOG_TOOLS.md) | Decode and compare resident captures |
 | [Analysis tools](ANALYSIS_TOOLS.md) | Validate offsets and audit patches offline |

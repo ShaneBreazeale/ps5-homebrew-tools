@@ -16,6 +16,7 @@ match historical binaries or support other consoles and firmware versions.
 | thread-probe-v2 | Explicitly requires firmware `(fw & 0xffff0000) == 0x13600000` and SoC `0x840fd0`; bounded kernel reads and a live self-check of list links, thread owner, and TID |
 | thread-probe-v3 | Same firmware and SoC gate as v2. Read-only walk of one title, repeated until the process is absent. Pair with `host/stream_logger.py`. Defaults are `PPSA90001`, 2000 ms, 300 passes |
 | follower-live | Requires a resident that implements this snapshot ABI (`KSTUFF_OBS=1`). Prints new ring words and the first sight of each tracked ioctl command. It does not install kstuff. A quiet `nmount` counter on 13.60 is expected; group `0x32` is the pfs mount transport when the resident records it |
+| dev-control | Firmware `(fw & 0xffff0000) == 0x13600000` only. It does not read the SoC id. Authenticated TCP 9098. No kernel reads or writes. Not console-validated |
 | thread summarizer | A completed three-pass v2 capture with 1,096-byte process records and 0x480-byte thread records |
 | kernel capture | PS5 Pro 13.60 with the exact resume instrumentation and validated page map in its named profile |
 | capture exporter/receiver | Matching FPK1-END1 tools and a completed collector manifest; no console runtime test yet |

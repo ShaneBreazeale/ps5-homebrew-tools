@@ -64,6 +64,7 @@ the payload's output to determine whether its work completed.
 | What thread records remain in the researched 13.60 environment? | [Thread probe v2](../payloads/thread-probe-v2/README.md) |
 | What is one title doing across a wedge or a long launch? | [Thread probe v3](../payloads/thread-probe-v3/README.md) with [stream_logger.py](../host/stream_logger.py) |
 | Which resident events and ioctl commands appear during a launch? | [Follower-live](../payloads/follower-live/README.md). On 13.60 a PPR mount is ioctl group `0x32`, not `nmount` |
+| How do I list processes, stop one chosen app, or copy an existing screenshot? | [Dev control](../payloads/dev-control/README.md). Firmware 13.60, per-boot token, TCP 9098. This build is not console-validated |
 
 Keep app launch timing and resident identity alongside the capture. Process watch
 and thread probes are separate payloads; this repository does not orchestrate

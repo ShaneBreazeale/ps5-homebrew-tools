@@ -25,6 +25,7 @@ Choose a tool for the question you want to answer:
 | [Thread probe v2](payloads/thread-probe-v2/README.md) | Capture selected processes' kernel thread records on firmware 13.60, SoC `0x840fd0` |
 | [Thread probe v3](payloads/thread-probe-v3/README.md) | Keep capturing one title's kernel thread records while the app is alive |
 | [Follower-live](payloads/follower-live/README.md) | Stream new resident ring words and first-seen ioctl commands until the session ends |
+| [Dev control](payloads/dev-control/README.md) | List processes, stop one chosen app, or copy an existing screenshot on TCP 9098. Firmware 13.60. Not console-validated |
 | [Kernel capture](docs/CAPTURE_TOOLS.md) and [capture export](docs/CAPTURE_TOOLS.md) | Collect and transfer a bounded kernel-text capture on the matching PS5 Pro 13.60 setup |
 | [Native app starter](docs/NATIVE_APP.md) | Build a controller, logging, and notification app folder and ZIP |
 

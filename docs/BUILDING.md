@@ -67,7 +67,7 @@ that artifact. Builds made before these rules, for example with Homebrew LLVM
 | Command | Result |
 | --- | --- |
 | `make` or `make help` | Show targets without requiring an SDK |
-| `make all` | Compile both debugger/inspection tools, nine diagnostic payloads and the minimal payload |
+| `make all` | Compile both debugger/inspection tools, ten diagnostic payloads and the minimal payload |
 | `make resident-snapshot process-watch` | Compile selected payloads |
 | `make kernel-offset` | Build the kernel offset inspection payload; see [kernel backend](KERNEL_DEBUGGER.md) |
 | `make kernel-execution-check` | SDK-compile the portable [SMP coordinator](KERNEL_EXECUTION.md) into an object; no payload or installer |
@@ -83,6 +83,7 @@ that artifact. Builds made before these rules, for example with Homebrew LLVM
 | `make thread-probe-v1 thread-probe-v2` | Compile the raw collectors |
 | `make thread-probe-v3` | Compile the repeating title walker; pair it with `host/stream_logger.py` |
 | `make follower-live` | Compile the resident ring and ioctl streamer |
+| `make dev-control` | Compile the development-control payload for firmware 13.60; see [dev-control](../payloads/dev-control/README.md). Not console-validated |
 | `make kernel-capture capture-export` | Build the collector and exporter |
 | `make bundle` | Build payloads and package source, binaries, SHA-256 inventory, and toolchain versions |
 | `make container-build` | Build all payloads in the pinned reference container |

@@ -52,7 +52,7 @@ CFLAGS += -Wall -Wextra
 define link_cleanup
 $(OBJCOPY) --remove-section=.comment $@
 endef
-TOOLS := kernel-offset process-debugger resident-snapshot process-watch process-snapshot thread-probe-v1 thread-probe-v2 thread-probe-v3 follower-live kernel-capture capture-export
+TOOLS := kernel-offset process-debugger resident-snapshot process-watch process-snapshot thread-probe-v1 thread-probe-v2 thread-probe-v3 follower-live kernel-capture capture-export dev-control
 
 .DELETE_ON_ERROR:
 .PHONY: all
@@ -107,7 +107,7 @@ out/resident-snapshot.elf: payloads/resident-snapshot/main.c vendor/kstuff/uelf/
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) -Ivendor -Ivendor/kstuff $(LDFLAGS) -o $@ $< $(LDLIBS)
 	$(link_cleanup)
 
-$(addprefix out/,$(addsuffix .elf,process-watch process-snapshot thread-probe-v1 thread-probe-v2 thread-probe-v3 kernel-capture capture-export)): out/%.elf: payloads/%/main.c | out
+$(addprefix out/,$(addsuffix .elf,process-watch process-snapshot thread-probe-v1 thread-probe-v2 thread-probe-v3 kernel-capture capture-export dev-control)): out/%.elf: payloads/%/main.c | out
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(REPRO_FLAGS) $(LDFLAGS) -o $@ $< $(LDLIBS)
 	$(link_cleanup)
 
